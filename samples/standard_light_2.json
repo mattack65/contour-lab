@@ -10,13 +10,8 @@
     "topCenterY": 0,
     "strandSpacing": "perimeter",
     "scaleWithPerimeter": true,
-    "strandStyle": "continuous",
-    "blockUnit": 8,
-    "blockHeight": 9.6,
-    "blockShift": 1,
-    "blockSeed": 72631,
     "topSection": "ellipse",
-    "topOutline": "circle",
+    "topOutline": "ellipse",
     "smoothCavity": {
       "inset": 7,
       "floor": 0,
@@ -24,26 +19,37 @@
     },
     "bulgePoints": [
       {
-        "height": 33.33333333333333,
+        "height": 23.93333333333333,
         "bulge": 0,
         "offset": 0,
         "seed": 22360,
-        "centerX": 0,
-        "centerY": 4.3,
-        "sizeX": 100.9,
-        "sizeY": 100.9,
-        "lockProportions": true
+        "centerX": 6,
+        "centerY": -11.2,
+        "sizeX": 61.8,
+        "sizeY": 79.6,
+        "lockProportions": false
       },
       {
-        "height": 66.8,
+        "height": 48.800000000000004,
+        "bulge": 0,
+        "offset": 0,
+        "seed": 38198,
+        "centerX": -6.9,
+        "centerY": -20.5,
+        "sizeX": 67.4,
+        "sizeY": 77.5,
+        "lockProportions": false
+      },
+      {
+        "height": 74.13333333333334,
         "bulge": 0,
         "offset": 0,
         "seed": 30279,
-        "centerX": -3.2,
-        "centerY": 0,
-        "sizeX": 100.6,
-        "sizeY": 100.6,
-        "lockProportions": true
+        "centerX": 3.5,
+        "centerY": -1.7,
+        "sizeX": 86.8,
+        "sizeY": 96.9,
+        "lockProportions": false
       }
     ],
     "count": 48,
@@ -64,7 +70,7 @@
     "wanderSeed": 155729,
     "motion": "sine",
     "waveAmplitude": 20,
-    "waveCycles": 0.75,
+    "waveCycles": 1.25,
     "alternateTwist": true,
     "randomTwist": false,
     "twistSeed": 42424,
@@ -83,7 +89,7 @@
     "phaseTurns": 0,
     "outline": "circle",
     "bottomSizeY": 58.97632999772026,
-    "topSizeY": 86.9,
+    "topSizeY": 74,
     "topInset": 0,
     "insetSeed": 206522,
     "bottomInset": 0,
@@ -99,6 +105,6 @@
     "bottomTangential": 0,
     "bottomTangentialSeed": 14142,
     "bottomProportionsLocked": false,
-    "topProportionsLocked": false
+    "topProportionsLocked": true
   }
 }

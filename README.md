@@ -4,6 +4,12 @@ A local, browser-based tool for designing parametric sculptures, vases and lamps
 
 An experimental personal project, shared as-is. No support or maintenance commitments.
 
+<a href="samples/README.md#real-prints"><img src="samples/images/print-illuminated-lamp.jpg" width="320" alt="A real illuminated lampshade made with Contour Lab"></a>
+
+<a href="samples/README.md"><img src="samples/images/standard_light_1.jpg" width="19%" alt="Standard light 1"><img src="samples/images/standard_light_2.jpg" width="19%" alt="Standard light 2"><img src="samples/images/slim_asymmetric_1.jpg" width="19%" alt="Slim asymmetric"><img src="samples/images/funky_2.jpg" width="19%" alt="Funky"><img src="samples/images/hairy.jpg" width="19%" alt="Hairy"></a>
+
+[Sample gallery and recipes](samples/README.md)
+
 ## Install and run on your own computer
 
 1. Install and start Docker Desktop: [Windows](https://docs.docker.com/desktop/setup/install/windows-install/) or [Mac](https://docs.docker.com/desktop/setup/install/mac-install/). On Windows use Linux containers / WSL 2; on Mac choose the installer for Intel or Apple Silicon. On Linux, install [Docker Engine with the Compose plugin](https://docs.docker.com/engine/install/).
