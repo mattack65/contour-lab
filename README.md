@@ -26,6 +26,6 @@ Tested on Windows with Docker Desktop (Linux/amd64). The image is built for your
 
 ## Samples and licence
 
-`samples/` is reserved for future recipes.
+The [samples](samples/) folder contains five example recipes. Click **Load** in Contour Lab and choose one of these JSON files, then click **Build**.
 
 Contour Lab is licensed under **GPL-3.0-or-later**; see [LICENSE](LICENSE). Third-party components retain their own licences; see [THIRD_PARTY.md](THIRD_PARTY.md).

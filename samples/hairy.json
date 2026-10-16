@@ -1,0 +1,72 @@
+{
+  "format": "contour-lab",
+  "version": 3,
+  "model": "rectangles",
+  "units": "mm",
+  "recipe": {
+    "smoothCavity": {
+      "inset": 8,
+      "floor": 5,
+      "repairInset": 5,
+      "fillPockets": true
+    },
+    "bulgePoints": [
+      {
+        "height": 33.333333333333336,
+        "bulge": 10,
+        "offset": 10,
+        "seed": 27182
+      },
+      {
+        "height": 66.66666666666667,
+        "bulge": 20,
+        "offset": 20,
+        "seed": 30279
+      }
+    ],
+    "count": 200,
+    "width": 6,
+    "depth": 10,
+    "diameter": 100,
+    "topDiameter": 200,
+    "height": 300,
+    "twist": 0,
+    "orbitTwist": 45,
+    "alternateOrbit": true,
+    "layerHeight": 0.3,
+    "motion": "sine",
+    "waveAmplitude": 5,
+    "waveCycles": 3,
+    "alternateTwist": false,
+    "bottomDisc": false,
+    "discHole": 40,
+    "discThickness": 2,
+    "bulge": 1.3043478260869605,
+    "twoBulges": true,
+    "bulgeLower": 4,
+    "bulgeUpper": 4,
+    "section": "circle",
+    "sectionSides": 32,
+    "taperSection": true,
+    "topWidth": 10,
+    "topDepth": 15,
+    "phaseTurns": 2,
+    "outline": "circle",
+    "bottomSizeY": 100,
+    "topSizeY": 140,
+    "topInset": -80,
+    "insetSeed": 152174,
+    "bottomInset": 0,
+    "bottomInsetSeed": 31415,
+    "lowerInset": -3,
+    "lowerInsetSeed": 27182,
+    "upperInset": -3,
+    "upperInsetSeed": 16180,
+    "middleInset": -10,
+    "middleInsetSeed": 22360,
+    "topTangential": 100,
+    "topTangentialSeed": 57721,
+    "bottomTangential": 0,
+    "bottomTangentialSeed": 14142
+  }
+}
