@@ -581,12 +581,20 @@ export function meshTreeForExport(growth: TreeGrowth, recipe: TreeRecipe, progre
 /** Intersect actual triangles, so the inspector includes merged junctions and multiple outlines. */
 export function sliceMesh(geometry: BufferGeometry, z: number): number[] {
   const p=geometry.getAttribute('position'),idx=geometry.getIndex()!,lines:number[]=[];
+  // A Boolean operation can leave an ostensibly flat bottom a few microns
+  // uneven. At the exact lower boundary, slicing through its triangulation
+  // shows radial wedges instead of the limiting section just inside the solid.
+  // Bias only that boundary query; preserve displayed Z and the mesh itself.
+  if(!geometry.boundingBox)geometry.computeBoundingBox();
+  const bounds=geometry.boundingBox!;
+  const epsilon=Math.min(.001,(bounds.max.z-bounds.min.z)/1000);
+  const sampleZ=z===bounds.min.z?z+epsilon:z;
   for(let i=0;i<idx.count;i+=3) {
     const ids=[idx.getX(i),idx.getX(i+1),idx.getX(i+2)], hits:number[]=[];
     for(let j=0;j<3;j++) {
       const a=ids[j],b=ids[(j+1)%3],az=p.getZ(a),bz=p.getZ(b);
-      if((az<=z&&bz>z)||(bz<=z&&az>z)) {
-        const t=(z-az)/(bz-az);hits.push(p.getX(a)+(p.getX(b)-p.getX(a))*t,p.getY(a)+(p.getY(b)-p.getY(a))*t,z);
+      if((az<=sampleZ&&bz>sampleZ)||(bz<=sampleZ&&az>sampleZ)) {
+        const t=(sampleZ-az)/(bz-az);hits.push(p.getX(a)+(p.getX(b)-p.getX(a))*t,p.getY(a)+(p.getY(b)-p.getY(a))*t,z);
       }
     }
     if(hits.length===6)lines.push(...hits);
