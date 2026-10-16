@@ -1,0 +1,10 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.stl
+*.3mf
+.DS_Store
+Thumbs.db

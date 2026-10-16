@@ -1,0 +1,22 @@
+name: contour-lab
+services:
+  studio:
+    build: .
+    image: contour-lab:local
+    restart: unless-stopped
+    cpus: "${CONTOUR_CPUS:-4}"
+    mem_limit: "${CONTOUR_MEMORY:-8g}"
+    init: true
+    stop_grace_period: 15s
+    ports:
+      - "127.0.0.1:${CONTOUR_PORT:-5173}:5173"
+    tmpfs:
+      - /tmp:size=1024m
+    environment:
+      NATIVE_THREADS: "${NATIVE_THREADS:-4}"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

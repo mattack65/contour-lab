@@ -1,0 +1,11 @@
+.git
+node_modules
+dist
+__pycache__
+**/__pycache__
+*.pyc
+.env
+.env.*
+samples
+*.stl
+*.3mf

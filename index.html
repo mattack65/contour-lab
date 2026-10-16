@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f3ee" />
+    <title>Contour lab</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <a class="wordmark" href="/" aria-label="Contour lab home"><span class="mark">≋</span> contour<span>lab</span></a>
+        <span class="edition">GENERATIVE FORMS</span>
+        <span class="live"><i></i> Ready to shape</span>
+      </header>
+      <main>
+        <section class="workspace" aria-label="Interactive 3D workspace">
+          <div class="intro"><div class="eyebrow" id="study-title">STRANDS / SHAPE / MOTION</div><h1>A little order.<br>A little wild.</h1><p>Small rules. Unexpected growth.</p></div>
+          <div id="viewport" aria-label="3D sculpture preview"></div>
+          <div class="viewbar" aria-label="Preview mode">
+            <button data-mode="solid" aria-pressed="true">Solid</button>
+            <button data-mode="contours" aria-pressed="false">Contours</button>
+            <button data-mode="both" aria-pressed="false">Overlay</button>
+          </div>
+          <div class="canvas-build" aria-label="Build sculpture">
+          <p id="build-error" role="alert" hidden></p>
+          <button id="build" class="primary">Build</button>
+          <section id="build-progress" aria-label="Build progress" hidden>
+            <div data-progress="steps" class="progress-steps" aria-hidden="true"></div>
+            <strong data-progress="phase" role="status" aria-live="polite"></strong>
+            <p data-progress="message"></p>
+            <progress data-progress="bar" max="1" aria-label="Current build step"></progress>
+            <div data-progress="count" class="progress-count"></div>
+            <div data-progress="elapsed" class="progress-elapsed"></div>
+            <details data-progress="timings" hidden><summary>Phase timings</summary><div data-progress="timing-list"></div></details>
+          </section>
+          <p id="build-metrics" hidden></p>
+          <div id="build-dimensions" class="stats" hidden><div><span>HEIGHT</span><strong id="stat-height"></strong></div><div><span>FOOTPRINT</span><strong id="stat-width"></strong></div></div>
+          <p id="build-state" role="status" aria-live="polite">Adjust settings, then build when ready.</p>
+          </div>
+          <div class="canvas-tools"><button id="reset-camera" title="Reset camera">↗ Reset view</button><button id="rotate" aria-pressed="false">↻ Rotate</button></div>
+          <div class="axis-note">Z ↑ <span>millimetres</span></div>
+          <div class="gesture-note">Drag to orbit <span>·</span> Scroll to zoom <span>·</span> Right-drag to pan</div>
+          <div class="specimen"><span id="specimen-title">STRANDS</span> <span id="specimen-seed"></span></div>
+        </section>
+        <aside>
+          <div class="panel-heading"><span class="eyebrow">VIEW &amp; FILES</span><h2>Preview &amp; export.</h2><p>Shape the outline, then edit its structure. Space opens Structure.</p><button id="open-silhouette" data-open-silhouette aria-haspopup="dialog">Edit shape</button><button id="expand-recipe" aria-haspopup="dialog" aria-controls="recipe-dialog" aria-keyshortcuts="Space" title="Edit structure (Space)" aria-expanded="false">Edit structure · Space</button></div>
+
+        <div class="shared-recipe-files"><div class="recipe-actions recipe-toolbar"><button id="save">Save</button><button id="load">Load</button><input id="recipe-file" type="file" accept=".json,application/json" hidden /></div></div>
+          <div class="preview-detail-control">
+            <fieldset id="preview-detail" class="horizontal-options">
+              <legend>Preview detail</legend>
+              <div><label><input type="radio" name="preview-detail" value="1" checked /> Standard</label><label><input type="radio" name="preview-detail" value="2" /> Fine</label><label><input type="radio" name="preview-detail" value="4" /> Very fine</label></div>
+            </fieldset>
+            <p>Higher detail takes longer. Click Build to apply. Lightweight STL uses the preview; full STL keeps its own detail setting.</p>
+          </div>
+          <div class="sculpture-color-control">
+            <div class="color-heading">Sculpture color</div>
+            <div class="sculpture-color-inputs">
+              <button id="sculpture-color" type="button" aria-label="Choose sculpture color" aria-haspopup="dialog" aria-controls="color-popover" aria-expanded="false"><span></span> Choose</button>
+              <div id="color-swatches" role="group" aria-label="Four custom colors"></div>
+            </div>
+            <div id="color-popover" popover="auto" role="dialog" aria-label="Choose sculpture color">
+              <div class="color-popover-heading"><strong>Choose color</strong><button id="color-close" aria-label="Close color chooser">×</button></div>
+              <div id="color-preview" aria-hidden="true"></div>
+              <label for="color-hue">Hue</label><input id="color-hue" type="range" min="0" max="360" step="1" />
+              <label for="color-saturation">Saturation</label><input id="color-saturation" type="range" min="0" max="100" step="1" />
+              <label for="color-lightness">Lightness</label><input id="color-lightness" type="range" min="0" max="100" step="1" />
+              <p>Save this color to a quick-pick slot:</p><div id="color-save-slots"></div>
+              <button id="color-native" type="button">Existing custom colors…</button>
+              <p id="color-save-note" role="status">Choose a saved system color, then store it in a slot above.</p>
+            </div>
+              <input id="color-native-input" type="color" tabindex="-1" aria-label="Import from system color chooser" />
+            <p id="color-slots-hint" class="color-slots-hint">Click an empty slot to copy a color from your existing chooser.</p>
+            <fieldset id="sculpture-finish" class="horizontal-options">
+              <legend>Surface finish</legend>
+              <div><label><input type="radio" name="sculpture-finish" value="matte" checked /> Matte</label><label><input type="radio" name="sculpture-finish" value="satin" /> Satin</label><label><input type="radio" name="sculpture-finish" value="glossy" /> Glossy</label></div>
+            </fieldset>
+            <p id="sculpture-color-note">Preview appearance · no rebuild needed. STL files do not store color or finish.</p>
+          </div>
+          <div class="overhang-control">
+            <label><input id="show-overhangs" type="checkbox" /> Show overhangs in red</label>
+            <label class="overhang-threshold" for="overhang-threshold">Threshold · ° <input id="overhang-threshold" type="number" min="0" max="90" step="1" value="45" /></label>
+            <p id="overhang-note" hidden>Angles from vertical · build-plate contact excluded. Preview guide, not a printability guarantee.</p>
+          </div>
+
+          <section class="slice-panel">
+            <label class="inspector-toggle"><input id="show-layer-inspector" type="checkbox" aria-controls="layer-inspector" /> Show layer inspector</label>
+            <div id="layer-inspector" hidden>
+            <label class="inspector-toggle"><input id="hide-above-layer" type="checkbox" /> Hide above selected layer</label>
+            <p class="slice-hint">Red shows solid material at the cut; cavities stay open. STL exports keep the complete model.</p>
+            <div class="section-label">LAYER INSPECTOR <span id="layer-count"></span></div>
+            <div class="slice-reading"><strong id="layer-height">40.0 <small>mm</small></strong><span id="layer-index"></span></div>
+            <label class="sr-only" for="layer">Inspect layer</label><input id="layer" type="range" min="0" max="400" value="200" step="1" />
+            <div class="range-labels"><span>BASE</span><span>TOP + 1 mm</span></div>
+            <p class="slice-hint">Amber outlines show this slice through the preview.</p>
+            </div>
+          </section>
+          <h3 class="sidebar-section-title">Exports</h3>
+          <div id="solid-export-options">
+            <label><input id="solid-export" type="checkbox" /> Export solid body (fill centre)</label>
+            <p class="export-note">Keeps the outer wall and fills the centre, including any plate hole. Requires a continuous closed outer contour. Applies to the full, reduced and lightweight STL buttons; preview stays unchanged. For an open vase: 3 perimeters, 0% infill, 0 top solid layers, and bottom solid layers enabled.</p>
+          </div>
+          <label class="filename-label" for="stl-step">STL step · mm<input id="stl-step" type="number" min="0.1" max="1" step="any" required /></label>
+          <p id="stl-step-note" class="export-note">Full, reduced and smooth wall STL. Larger steps reduce detail and file size. No preview rebuild needed.</p>
+          <button id="export" class="primary">Export full STL <span>↓</span></button>
+          <button id="export-reduced" class="secondary-export" disabled>Export reduced STL <span>↓</span></button>
+          <p class="export-note">Full detail, simplified toward ⅓ of the faces. Same mesh checks as full export; no strict distance limit. May retain more faces.</p>
+
+          <button id="export-lightweight" class="secondary-export" disabled>Export lightweight STL <span>↓</span></button>
+          <p id="lightweight-note" class="export-note">Preview detail for viewing and sharing. Use full or reduced STL for printing.</p>
+
+          <button id="export-smooth-wall" class="secondary-export" disabled>Export smooth wall STL <span>↓</span></button>
+          <p class="export-note">Slicer modifier: only the wall between the inner cavity and outer repair fill, plus the cavity floor when enabled. Separate bottom plate excluded. Enable smooth interior and outer fill, then Build. Import as a modifier on the main STL and keep the original position.</p>
+
+          <p id="last-export" class="export-note" hidden></p>
+          <details class="model-details"><summary>Model details</summary>
+            <p id="growth-note"></p><p id="export-note"></p>
+          </details>
+          <p id="status" role="status" aria-live="polite">Ready to explore.</p>
+        </aside>
+      </main>
+      <footer><span>CONTOUR LAB <b>/</b> AN EXERCISE IN CONTROLLED RANDOMNESS</span><span>Built one layer at a time.</span></footer>
+    </div>
+    <dialog id="recipe-dialog" aria-labelledby="expanded-recipe-title" aria-describedby="expanded-recipe-hint">
+      <div class="expanded-recipe-shell">
+        <header class="expanded-recipe-header">
+          <div><h2 id="expanded-recipe-title">Strands & structure.</h2><p id="expanded-recipe-hint">Strands, random offsets, plate and interior. Edit shape for outlines and levels. Ctrl+Enter builds; Esc folds back.</p></div>
+          <div class="recipe-header-actions"><button data-open-silhouette aria-haspopup="dialog">Edit shape</button><button id="fold-recipe" autofocus>Fold back to preview →</button><button id="build-recipe" aria-keyshortcuts="Control+Enter Meta+Enter" title="Fold back and build (Ctrl+Enter)">Build · Ctrl+Enter</button></div>
+        </header>
+
+        <div id="expanded-recipe-controls"><div id="controls"></div></div>
+      </div>
+    </dialog>
+    <dialog id="filename-dialog" aria-labelledby="filename-title" aria-describedby="filename-hint">
+      <form id="filename-form" novalidate>
+        <h2 id="filename-title">Save file</h2>
+        <p id="filename-hint"></p>
+        <label for="filename-input">Filename</label>
+        <input id="filename-input" type="text" autocomplete="off" spellcheck="false" aria-describedby="filename-error filename-preview" />
+        <p id="filename-preview"></p>
+        <p id="filename-error" role="alert" hidden></p>
+        <div class="filename-actions"><button id="filename-cancel" type="button">Cancel</button><button id="filename-confirm" class="primary" type="submit">Save</button></div>
+      </form>
+    </dialog>
+    <script type="module"  src="/src/main.ts"></script>
+  </body>
+</html>
