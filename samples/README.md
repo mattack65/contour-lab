@@ -14,12 +14,9 @@ Or click **View in 3D** to rotate and zoom a sample directly on GitHub. These sm
 | **Hairy** | **Vase bubbles** |
 | [![Hairy](images/hairy.jpg)](hairy.json) | [![Vase bubbles](images/vase_bubbles.jpg)](vase_bubbles.json) |
 | [hairy.json](hairy.json) · [View in 3D](models/hairy.stl) | [vase_bubbles.json](vase_bubbles.json) · [View in 3D](models/vase_bubbles.stl) |
-| **Cone sin** | **Cone** |
-| [![Cone sin](images/cone_sin.jpg)](cone_sin.json) | [![Cone](images/cone.jpg)](cone.json) |
-| [cone_sin.json](cone_sin.json) · [View in 3D](models/cone_sin.stl) | [cone.json](cone.json) · [View in 3D](models/cone.stl) |
-| **Woven 2** | **Woven** |
-| [![Woven 2](images/woven_2.jpg)](woven_2.json) | [![Woven](images/woven.jpg)](woven.json) |
-| [woven_2.json](woven_2.json) · [View in 3D](models/woven_2.stl) | [woven.json](woven.json) · [View in 3D](models/woven.stl) |
+| **Cone** | **Woven 2** |
+| [![Cone](images/cone.jpg)](cone.json) | [![Woven 2](images/woven_2.jpg)](woven_2.json) |
+| [cone.json](cone.json) · [View in 3D](models/cone.stl) | [woven_2.json](woven_2.json) · [View in 3D](models/woven_2.stl) |
 | **Raspberry** |  |
 | [![Raspberry](images/raspberry.jpg)](raspberry.json) |  |
 | [raspberry.json](raspberry.json) · [View in 3D](models/raspberry.stl) |  |
