@@ -51,7 +51,7 @@ export class BuildProgressView {
  finish(outcome:'complete'|'failed'|'cancelled') {
   if(!this.active)return;this.record();this.tick();this.active=false;this.stopTimer();this.root.dataset.state=outcome;
   this.node('phase').textContent=outcome==='complete'?'Build complete':outcome==='failed'?'Build failed':'Build cancelled';
-  this.node('message').textContent=outcome==='complete'?'Preview ready.':outcome==='failed'?'See the error above.':'Settings changed; start a new build when ready.';
+  this.node('message').textContent=outcome==='complete'?'Preview ready.':outcome==='failed'?'See the error above.':'Stopped; start a new build when ready.';
   const bar=this.node<HTMLProgressElement>('bar');bar.value=outcome==='complete'?1:0;
   this.node('count').textContent='';
   for(const item of this.node('steps').children){const el=item as HTMLElement;if(outcome==='complete'){el.dataset.state=this.durations.has(el.dataset.phase as BuildPhase)?'done':'skipped';el.title=el.dataset.state==='skipped'?'Not needed for this build':'';}}

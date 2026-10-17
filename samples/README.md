@@ -17,7 +17,11 @@ These are screenshots of the actual models at Standard preview detail. Views are
 
 ## Real prints
 
-Physical prints made with Contour Lab. These illustrate other designs and are not necessarily the exact recipes above.
+**Standard light 2**, printed and illuminated. [Load this recipe](standard_light_2.json).
+
+<a href="images/print-standard-light-2.jpg"><img src="images/print-standard-light-2.jpg" width="360" alt="Standard light 2: a printed, illuminated lampshade with an asymmetric silhouette and curved ribs"></a>
+
+More physical prints made with Contour Lab. These illustrate other designs and are not necessarily the exact recipes above.
 
 | Purple lattice | Blue strands |
 | --- | --- |

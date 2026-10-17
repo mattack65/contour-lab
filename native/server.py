@@ -1,3 +1,4 @@
+from cancellation import jobs, run_cancellable, Cancelled
 import json, os, subprocess, threading, struct, tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.metadata import version
@@ -73,6 +74,13 @@ class Handler(BaseHTTPRequestHandler):
         finally: gate.release()
 
     def do_POST(self):
+        if self.path=="/cancel":
+            self.close_connection=True
+            token=self.headers.get("X-Contour-Job-ID", "")
+            if not jobs.valid(token): return self.reply(400,b'{"error":"Invalid job ID"}')
+            job=jobs.cancel(token)
+            finished=job is None or job.done.wait(2)
+            return self.reply(200,json.dumps({"cancelled":True,"finished":finished}).encode())
         if self.path=="/simplify": return self.simplify()
         if self.path!="/union": return self.reply(404,b'{"error":"Not found"}')
         try: size=int(self.headers.get("Content-Length","0"))
@@ -85,7 +93,17 @@ class Handler(BaseHTTPRequestHandler):
         if not gate.acquire(blocking=False):
             self.close_connection=True
             return self.reply(503,b'{"error":"Native fusion is still processing the previous build. Please retry shortly."}')
+        token=self.headers.get("X-Contour-Job-ID", "")
+        job=None
         try:
+            if token:
+                if not jobs.valid(token):
+                    self.close_connection=True
+                    return self.reply(400,b'{"error":"Invalid job ID"}')
+                try: job=jobs.start(token)
+                except ValueError:
+                    self.close_connection=True
+                    return self.reply(409,b'{"error":"Duplicate job ID"}')
             blob=self.rfile.read(size)
             if len(blob)!=size:
                 self.close_connection=True
@@ -100,7 +118,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(422,b'{"error":"Invalid mesh header"}')
             timeout=600 if header.get("quality")=="export" else 180
             oom_before=oom_kills()
-            result=subprocess.run(["python","compute.py"],input=blob,capture_output=True,timeout=timeout)
+            result=run_cancellable(["python","compute.py"],input=blob,timeout=timeout,job=job) if job else subprocess.run(["python","compute.py"],input=blob,capture_output=True,timeout=timeout)
             if result.returncode:
                 oom_after=oom_kills()
                 if result.returncode==-9 and oom_before is not None and oom_after is not None and oom_after>oom_before:
@@ -112,8 +130,13 @@ class Handler(BaseHTTPRequestHandler):
             metrics=json.loads(result.stdout[4:4+length])["metrics"]
             print(json.dumps({"quality":header.get("quality","preview"),"metrics":metrics}),flush=True)
             self.reply(200,result.stdout,"application/octet-stream")
+        except Cancelled:
+            self.close_connection=True
+            self.reply(409,b'{"error":"Build cancelled"}')
         except subprocess.TimeoutExpired:
             self.reply(504,json.dumps({"error":f"Native fusion exceeded the {timeout} second limit"}).encode())
-        finally: gate.release()
+        finally:
+            gate.release()
+            if job: jobs.finish(token,job)
 if __name__=="__main__":
     ThreadingHTTPServer(("0.0.0.0",8000),Handler).serve_forever()

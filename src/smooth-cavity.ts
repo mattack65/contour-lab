@@ -227,10 +227,15 @@ export async function smoothCavity(source:BufferGeometry,input:RectangleRecipe,q
         continue;
       }
       // Separate budgets: repairing a sliver must not consume contact retries.
-      if(!(error instanceof LatticeContactError)||contactRepairs>=2)throw error;
+      // A cavity boolean can leave a longer exact four-face touching edge.
+      // The repair's displacement is bounded by its pin radius, not edge length.
+      // Only balanced four-face contacts qualify; holes/wrong winding still fail.
+      const contacts=error instanceof LatticeContactError?error.contacts
+        :error instanceof LatticeSeamError?error.touchingContacts:undefined;
+      if(!contacts?.length||contacts.length>64||contactRepairs>=2)throw error;
       contactRepairs++;
       progress('Resolving microscopic smooth-interior contact edges…');
-      const healed=resolveLatticeContacts(final,error.contacts,wasm);solids.add(healed);
+      const healed=resolveLatticeContacts(final,contacts,wasm);solids.add(healed);
       if(healed.status()!=='NoError')throw new Error('Smooth-interior contact repair failed.');
       const rounded=new wasm.Manifold(healed.getMesh());solids.add(rounded);
       if(rounded.status()!=='NoError')throw new Error('Smooth-interior contact repair could not form a closed export mesh.');

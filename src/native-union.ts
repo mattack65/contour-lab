@@ -1,4 +1,6 @@
 import type {Manifold,ManifoldToplevel} from 'manifold-3d';
+let nativeJobId:string|undefined;
+export function setNativeJobId(id:string|undefined){nativeJobId=id;}
 
 /** Preserve the exact sampled plank inputs; only their Boolean union runs natively. */
 export async function nativeUnion(solids:Manifold[],wasm:ManifoldToplevel,bottomDisc:boolean,progress:(s:string)=>void,quality:'preview'|'export'='preview',options:{consumeInputs?:boolean}={}) {
@@ -20,7 +22,7 @@ export async function nativeUnion(solids:Manifold[],wasm:ManifoldToplevel,bottom
   meshes.length=0;
   if(options.consumeInputs)while(solids.length)solids.pop()!.delete();
   progress('Fusing planks with the native engine…');
-  const response=await fetch('/api/native/union',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:packet,signal:AbortSignal.timeout(quality==='export'?610000:185000)});
+  const response=await fetch('/api/native/union',{method:'POST',headers:{'Content-Type':'application/octet-stream',...(nativeJobId?{'X-Contour-Job-ID':nativeJobId}:{})},body:packet,signal:AbortSignal.timeout(quality==='export'?610000:185000)});
   if(!response.ok) {
     const detail=await response.json().catch(()=>({error:response.statusText}));
     throw new Error('Native fusion: '+detail.error);

@@ -24,7 +24,7 @@
           </div>
           <div class="canvas-build" aria-label="Build sculpture">
           <p id="build-error" role="alert" hidden></p>
-          <button id="build" class="primary">Build</button>
+          <div class="build-actions"><button id="build" class="primary">Build</button><button id="cancel-build" type="button" hidden>Cancel</button></div>
           <section id="build-progress" aria-label="Build progress" hidden>
             <div data-progress="steps" class="progress-steps" aria-hidden="true"></div>
             <strong data-progress="phase" role="status" aria-live="polite"></strong>
@@ -46,7 +46,7 @@
         <aside>
           <div class="panel-heading"><span class="eyebrow">VIEW &amp; FILES</span><h2>Preview &amp; export.</h2><p>Shape the outline, then edit its structure. Space opens Structure.</p><button id="open-silhouette" data-open-silhouette aria-haspopup="dialog">Edit shape</button><button id="expand-recipe" aria-haspopup="dialog" aria-controls="recipe-dialog" aria-keyshortcuts="Space" title="Edit structure (Space)" aria-expanded="false">Edit structure · Space</button></div>
 
-        <div class="shared-recipe-files"><div class="recipe-actions recipe-toolbar"><button id="save">Save</button><button id="load">Load</button><input id="recipe-file" type="file" accept=".json,application/json" hidden /></div></div>
+        <div class="shared-recipe-files"><div class="recipe-actions recipe-toolbar"><button id="save">Save</button><button id="load">Load</button><button id="clear" title="Start again with the simple default sculpture">Clear</button><input id="recipe-file" type="file" accept=".json,application/json" hidden /></div><p id="current-recipe" aria-live="polite">Recipe: Unsaved</p></div>
           <div class="preview-detail-control">
             <fieldset id="preview-detail" class="horizontal-options">
               <legend>Preview detail</legend>

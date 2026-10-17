@@ -1,6 +1,6 @@
 /** Enough for hundreds of editable levels, while rejecting accidental mesh uploads. */
 export const MAX_RECIPE_FILE_BYTES=1024*1024;
-export interface NamedRecipe {base:string;signature:string}
+export interface NamedRecipe {base:string;signature:string;filename?:string}
 
 /** Sort top-level fields; validated bulge points have a canonical field order. */
 export function recipeSignature(model:string,recipe:object):string {

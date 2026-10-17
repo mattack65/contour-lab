@@ -57,6 +57,7 @@ function showError(message:string) {
 }
 let generation = 0;
 let geometryWorker: Worker | undefined;
+let buildAbort: AbortController | undefined;
 let displayedModel = '';
 let displayedRecipe = '';
 let exporting = false;
@@ -94,6 +95,10 @@ function updateBuildButton(message: string) {
     button.textContent=building?'Building…':id==='build-recipe'?'Build · Ctrl+Enter':'Build';
   }
   document.querySelectorAll<HTMLButtonElement>('[data-open-silhouette]').forEach(b=>b.disabled=building||exporting);
+  el<HTMLButtonElement>('clear').disabled=building||exporting;
+  const cancel=el<HTMLButtonElement>('cancel-build');
+  cancel.hidden=!building;cancel.disabled=!!buildAbort?.signal.aborted;
+  cancel.textContent=cancel.disabled?'Cancelling…':'Cancel';
   el('build-state').textContent = humanText(message);
 }
 const buildProgress=new BuildProgressView(el('build-progress'));
@@ -107,15 +112,24 @@ try {
     // Existing recipe filenames must keep matching after an additive upgrade.
     const [model,entries]=JSON.parse(saved.signature);
     if(model==='rectangles')saved.signature=recipeSignature(model,validateRectangles(Object.fromEntries(entries)));
+    if(typeof saved.filename!=='string')delete saved.filename;
     namedRecipe=saved;
   }
 } catch { /* Naming is optional; geometry restoration is independent. */ }
 function rememberRecipeName(filename:string,model:string,params:object) {
   const base=recipeFileBase(filename);
   if(!base)return;
-  namedRecipe={base,signature:recipeSignature(model,params)};
+  namedRecipe={base,filename,signature:recipeSignature(model,params)};
+  updateRecipeFilename();
   try {localStorage.setItem('contour-lab-named-recipe',JSON.stringify(namedRecipe));}catch { /* Session-only fallback. */ }
 }
+function updateRecipeFilename() {
+  const name=namedRecipe?.filename|| (namedRecipe?namedRecipe.base+'.json':'Unsaved');
+  const modified=!!namedRecipe&&namedRecipe.signature!==recipeSignature(selection.model,currentRecipe());
+  el('current-recipe').textContent='Recipe: '+name+(modified?' · modified':'');
+  el('current-recipe').title=name;
+}
+updateRecipeFilename();
 const viewport = el('viewport');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#f3f1eb');
@@ -354,8 +368,20 @@ function updateSlice() {
 interface LatticeResult { geometry: THREE.BufferGeometry; lines: Float32Array; triangles: number; components: number; sampleStep: number; uncored?:RectanglePreviewMesh; filledPockets?:number; filledVolume?:number }
 function buildGeometry<T = LatticeResult>(params: RectangleRecipe, quality: 'preview'|'export', worker: Worker, signal?: AbortSignal, extra:Record<string,unknown>={}): Promise<T> {
   return new Promise((resolve,reject) => {
-    const cleanup = () => { worker.terminate(); signal?.removeEventListener('abort', abort); };
-    const abort = () => { cleanup(); reject(new DOMException('Settings changed during export.', 'AbortError')); };
+    const jobId=Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/,'$1-$2-$3-$4-$5');
+    let settled=false;
+    const cleanup = () => { settled=true;worker.onmessage=null;worker.onerror=null;worker.terminate();signal?.removeEventListener('abort',abort); };
+    const abort = () => {
+      if(settled)return;
+      cleanup();
+      // Send from the main thread: terminating a busy WASM worker cannot run its cleanup.
+      void fetch('/api/native/cancel',{method:'POST',headers:{'X-Contour-Job-ID':jobId},signal:AbortSignal.timeout(5000)})
+        .then(async response=>{
+          if(!response.ok)throw new Error('Cancellation was not acknowledged');
+          const result=await response.json();
+          reject(new DOMException(result.finished?'Build cancelled.':'Browser work stopped; native cancellation is still finishing.','AbortError'));
+        }).catch(()=>reject(new DOMException('Browser work stopped, but native cancellation could not be confirmed.','AbortError')));
+    };
     if (signal?.aborted) { abort(); return; }
     signal?.addEventListener('abort', abort, { once: true });
     worker.onerror = async event => {
@@ -370,6 +396,7 @@ function buildGeometry<T = LatticeResult>(params: RectangleRecipe, quality: 'pre
       reject(new Error(message));
     };
     worker.onmessage = event => {
+      if(settled)return;
       if(event.data.progress) {status(event.data.progress);if(building&&worker===geometryWorker)buildProgress.update(humanText(event.data.progress),event.data.work);return;}
       cleanup();
       if(event.data.error) {
@@ -383,12 +410,13 @@ function buildGeometry<T = LatticeResult>(params: RectangleRecipe, quality: 'pre
       geometry.computeBoundingBox();
       resolve({...event.data,geometry});
     };
-    worker.postMessage({recipe:params,quality,...extra});
+    worker.postMessage({recipe:params,quality,...extra,jobId});
   });
 }
 async function rebuild() {
-  if (exporting) return;
+  if (exporting||building) return;
   const ticket=++generation;
+  const controller=new AbortController();buildAbort=controller;
   geometryWorker?.terminate();
   el('build-error').hidden=true;
   building=true;updateBuildButton('Building these settings…');
@@ -409,12 +437,23 @@ async function rebuild() {
     const cached=cachedRectangleBase?.key===previewBaseKey(current,detail)?cachedRectangleBase.mesh:undefined;
     const source=cached?{mesh:cached,reuseBase:true,sampleStep:cached.sampleStep,components:cached.components}:undefined;
     if(cached)status('Reusing the checked strands; updating the interior…');
-    result=await buildGeometry<LatticeResult>(preview,'preview',geometryWorker,undefined,{...source,contours:false,previewDetail:detail});
+    result=await buildGeometry<LatticeResult>(preview,'preview',geometryWorker,controller.signal,{...source,contours:false,previewDetail:detail});
   } catch(error) {
-    if(ticket===generation) {buildProgress.finish('failed');showError('Could not build: '+(error as Error).message.replace(/[. ]+$/,'')+'. '+(displayedRecipe?'Previous preview retained.':''));building=false;updateBuildButton(`Could not build: ${(error as Error).message}`);status(`Could not build: ${(error as Error).message}`);}
+    if(ticket===generation) {
+      building=false;buildAbort=undefined;geometryWorker=undefined;
+      if(controller.signal.aborted) {
+        buildProgress.finish('cancelled');
+        const message=(error as Error).message+(displayedRecipe?' Previous preview retained.':'');
+        updateBuildButton(message);status(message);
+      } else {
+        buildProgress.finish('failed');showError('Could not build: '+(error as Error).message.replace(/[. ]+$/,'')+'. '+(displayedRecipe?'Previous preview retained.':''));
+        updateBuildButton('Could not build: '+(error as Error).message);
+      }
+    }
     updateExportButtons();return false;
   }
   if(ticket!==generation) {result.geometry.dispose();return;}
+  buildAbort=undefined;geometryWorker=undefined;
   buildProgress.update('Preparing display…',{phase:'display'});
   displayedModel=model; displayedRecipe=JSON.stringify(current);displayedPreviewDetail=detail;
   stopContourWorker();
@@ -475,13 +514,18 @@ function settingsChanged() {
   exportAbort?.abort();
   // Edits invalidate any in-flight result but never launch another build.
   if(building)buildProgress.finish('cancelled');else buildProgress.clear();
-  ++generation;geometryWorker?.terminate();geometryWorker=undefined;building=false;
+  ++generation;buildAbort?.abort();buildAbort=undefined;geometryWorker?.terminate();geometryWorker=undefined;building=false;
+  updateRecipeFilename();
   const ready=previewIsCurrent();
   updateExportButtons();
   const message=ready?'Preview is up to date.':'Settings changed — click Build. The preview still shows the previous build.';
   updateBuildButton(message);status(message);
 }
 el('build').addEventListener('click',()=>void rebuild());
+el('cancel-build').addEventListener('click',()=>{
+  if(!building||!buildAbort||buildAbort.signal.aborted)return;
+  buildAbort.abort();updateBuildButton('Cancelling build…');status('Cancelling build…');
+});
 function resetCamera() {
   requestRender(true);
   const current=currentRecipe();
@@ -765,6 +809,18 @@ el('save').addEventListener('click', async () => {
     status((error as Error).name==='AbortError'?'Recipe save cancelled.':`Could not save recipe: ${(error as Error).message}`);
   } finally {button.disabled=false;}
 });
+el('clear').addEventListener('click',()=>{
+  if(building||exporting)return;
+  // Remove optional values as well as resetting defaults; bindings keep this object.
+  for(const key of Object.keys(rectangles))delete (rectangles as unknown as Record<string,unknown>)[key];
+  Object.assign(rectangles,structuredClone(rectangleDefaults));
+  Object.assign(cavityOptions,{enabled:false,inset:3,floor:2,repair:false,repairInset:0,fillPockets:false});
+  namedRecipe=undefined;cachedRectangleBase=undefined;solidExport.checked=false;
+  try {localStorage.removeItem('contour-lab-named-recipe');localStorage.removeItem('contour-lab-study-v2');}catch { /* Session-only reset still works. */ }
+  el<HTMLInputElement>('stl-step').value=displayNumber(rectangles.layerHeight);
+  pane.refresh();showFolders();settingsChanged();
+  void rebuild();
+});
 el('load').addEventListener('click', () => el<HTMLInputElement>('recipe-file').click());
 el<HTMLInputElement>('recipe-file').addEventListener('change', async event => {
   const input = event.target as HTMLInputElement;
@@ -869,6 +925,7 @@ stlStep.value=displayNumber(rectangles.layerHeight);
 stlStep.addEventListener('input',()=>{
   if(stlStep.checkValidity()&&Number.isFinite(stlStep.valueAsNumber)){
     rectangles.layerHeight=stlStep.valueAsNumber;
+    updateRecipeFilename();
     if(previewIsCurrent())el('export-note').textContent='Full STL step '+displayNumber(rectangles.layerHeight)+' mm. Z up; all dimensions in millimetres.';
     el('stl-step-note').textContent='Full STL only. Larger steps reduce detail and file size. No preview rebuild needed.';
   }else el('stl-step-note').textContent='Enter an STL step from 0.1 to 1 mm.';

@@ -235,3 +235,5 @@
 .silhouette-center-values{margin-top:5px;}
 .silhouette-center-values label{white-space:nowrap;}
 .silhouette-centre{cursor:move;}
+
+.build-actions{display:flex;gap:8px}.build-actions #build{flex:1;width:auto}.canvas-build #cancel-build{pointer-events:auto;border:1px solid #a66b52;color:#824730;background:#fff6f1;padding:10px 16px}.canvas-build #cancel-build[hidden]{display:none}#current-recipe{font-size:13px;line-height:1.5;overflow-wrap:anywhere;margin:-12px 0 20px;color:#48543e}

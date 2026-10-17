@@ -1,3 +1,4 @@
+import {setNativeJobId} from './native-union.ts';
 import type {ProgressWork} from './build-progress.ts';
 import {parsePreviewDetail} from './preview-settings.ts';
 import Module from 'manifold-3d';
@@ -10,6 +11,7 @@ import {previewMesh,rectanglePreviewContours,previewGeometry} from './rectangle-
 import type {RectanglePreviewMesh} from './rectangle-preview.ts';
 
 self.onmessage = async event => {
+  setNativeJobId(event.data.jobId);
   let failedBase:RectanglePreviewMesh|undefined;
   try {
     if(event.data.operation==='contours') {

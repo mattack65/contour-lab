@@ -22,7 +22,7 @@ An experimental personal project, shared as-is. No support or maintenance commit
    ```
 
    The first run downloads dependencies and compiles the geometry engine; allow several minutes.
-5. Open **http://127.0.0.1:5173** in a modern browser. Edit the shape and strands, press **Build**, then export an STL. **Save** and **Load** keep recipes as JSON files on your computer.
+5. Open **http://127.0.0.1:5173** in a modern browser. Edit the shape and strands, press **Build**, then export an STL. **Save** and **Load** keep recipes as JSON files on your computer. **Clear** starts again with the default sculpture. **Cancel** stops a running build and keeps the previous preview. The current recipe filename appears below Save/Load, with a modified indicator after edits.
 
 Stop: `docker compose down`. Start again: `docker compose up -d`. Run these commands from the same folder. Keep your downloaded recipes and STL files separately when updating the software.
 
