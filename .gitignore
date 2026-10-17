@@ -8,3 +8,6 @@ __pycache__/
 *.3mf
 .DS_Store
 Thumbs.db
+
+# Small gallery-only STL previews.
+!samples/models/*.stl
