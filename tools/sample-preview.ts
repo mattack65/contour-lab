@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {toCreasedNormals} from 'three/addons/utils/BufferGeometryUtils.js';
 const select=document.querySelector<HTMLSelectElement>('#sample')!;
 const color=document.querySelector<HTMLInputElement>('#color')!;
 const save=document.querySelector<HTMLButtonElement>('#save')!;
@@ -17,7 +18,7 @@ const material=new THREE.MeshStandardMaterial({color:color.value,roughness:.5,me
 let mesh:THREE.Mesh|undefined,generation=0;
 const render=()=>renderer.render(scene,camera);controls.addEventListener('change',render);
 function reset(){if(!mesh)return;const box=new THREE.Box3().setFromObject(mesh),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());const distance=Math.max(size.length()*.5,1)/Math.sin(16*Math.PI/180)*1.06;controls.target.copy(center);camera.position.copy(center).add(new THREE.Vector3(1.1,-1.7,.85).normalize().multiplyScalar(distance));camera.near=Math.max(.01,distance/1000);camera.far=distance*10;camera.updateProjectionMatrix();controls.update();render();}
-async function load(){const id=++generation;save.disabled=true;status.textContent='Loading '+select.value+'…';try{const geometry=await new STLLoader().loadAsync('../samples/models/'+encodeURIComponent(select.value)+'.stl');if(id!==generation){geometry.dispose();return;}if(mesh){scene.remove(mesh);mesh.geometry.dispose();}geometry.computeVertexNormals();mesh=new THREE.Mesh(geometry,material);scene.add(mesh);reset();save.disabled=false;status.textContent=select.value+' · '+(geometry.getAttribute('position').count/3).toLocaleString()+' faces · drag to rotate';}catch(error){if(id===generation)status.textContent='Could not load preview: '+(error as Error).message;}}
+async function load(){const id=++generation;save.disabled=true;status.textContent='Loading '+select.value+'…';try{const geometry=await new STLLoader().loadAsync('../samples/models/'+encodeURIComponent(select.value)+'.stl');if(id!==generation){geometry.dispose();return;}if(mesh){scene.remove(mesh);mesh.geometry.dispose();}toCreasedNormals(geometry,Math.PI/3);mesh=new THREE.Mesh(geometry,material);scene.add(mesh);reset();save.disabled=false;status.textContent=select.value+' · '+(geometry.getAttribute('position').count/3).toLocaleString()+' faces · drag to rotate';}catch(error){if(id===generation)status.textContent='Could not load preview: '+(error as Error).message;}}
 select.addEventListener('change',()=>void load());color.addEventListener('input',()=>{material.color.set(color.value);render();});document.querySelector('#reset')!.addEventListener('click',reset);
 save.addEventListener('click',()=>{render();const a=document.createElement('a');a.download=select.value+'.jpg';a.href=renderer.domElement.toDataURL('image/jpeg',.9);a.click();});
 void load();
