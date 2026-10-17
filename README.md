@@ -4,7 +4,9 @@ A local, browser-based tool for designing parametric sculptures, vases and lamps
 
 An experimental personal project, shared as-is. No support or maintenance commitments.
 
-<a href="samples/README.md#real-prints"><img src="samples/images/print-illuminated-lamp.jpg" width="320" alt="A real illuminated lampshade made with Contour Lab"></a>
+| Standard light 1 · real print | Standard light 2 · real print |
+| --- | --- |
+| <a href="samples/README.md#real-prints"><img src="samples/images/print-illuminated-lamp.jpg" width="320" alt="Standard light 1, printed and illuminated"></a> | <a href="samples/README.md#real-prints"><img src="samples/images/print-standard-light-2.jpg" width="320" alt="Standard light 2, printed and illuminated"></a> |
 
 <a href="samples/README.md"><img src="samples/images/standard_light_1.jpg" width="19%" alt="Standard light 1"><img src="samples/images/standard_light_2.jpg" width="19%" alt="Standard light 2"><img src="samples/images/slim_asymmetric_1.jpg" width="19%" alt="Slim asymmetric"><img src="samples/images/funky_2.jpg" width="19%" alt="Funky"><img src="samples/images/hairy.jpg" width="19%" alt="Hairy"></a>
 

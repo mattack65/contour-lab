@@ -17,14 +17,17 @@ These are screenshots of the actual models at Standard preview detail. Views are
 
 ## Real prints
 
-**Standard light 2**, printed and illuminated. [Load this recipe](standard_light_2.json).
+The two **Standard lights**, printed and illuminated. “Standard” refers to the approximately 60 mm LED puck fitting used for these lamps.
 
-<a href="images/print-standard-light-2.jpg"><img src="images/print-standard-light-2.jpg" width="360" alt="Standard light 2: a printed, illuminated lampshade with an asymmetric silhouette and curved ribs"></a>
+| Standard light 1 | Standard light 2 |
+| --- | --- |
+| <a href="images/print-illuminated-lamp.jpg"><img src="images/print-illuminated-lamp.jpg" width="320" alt="Standard light 1, printed and illuminated"></a> | <a href="images/print-standard-light-2.jpg"><img src="images/print-standard-light-2.jpg" width="320" alt="Standard light 2, printed and illuminated"></a> |
+| [standard_light_1.json](standard_light_1.json) | [standard_light_2.json](standard_light_2.json) |
 
 More physical prints made with Contour Lab. These illustrate other designs and are not necessarily the exact recipes above.
 
 | Purple lattice | Blue strands |
 | --- | --- |
 | ![Purple lattice print](images/print-purple-lattice.jpg) | ![Blue strand print](images/print-blue-strands.jpg) |
-| **Black asymmetric vase** | **Illuminated lampshade** |
-| ![Black asymmetric vase](images/print-black-asymmetric.jpg) | ![Illuminated lampshade](images/print-illuminated-lamp.jpg) |
+| **Black asymmetric vase** | |
+| ![Black asymmetric vase](images/print-black-asymmetric.jpg) | |
