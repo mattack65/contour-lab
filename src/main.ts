@@ -1,3 +1,4 @@
+import {editStrandPolygon} from './polygon-editor.ts';
 import {setupSilhouetteEditor} from './silhouette-editor.ts';
 import {BuildProgressView} from './build-progress.ts';
 import * as THREE from 'three';
@@ -553,6 +554,14 @@ function resetCamera() {
 }
 const pane = new Pane({ container: el('controls') });
 const rectangleShape=pane.addFolder({title:'01 / Strands & motion',expanded:true});
+function editCustomSection(top:boolean) {
+  if(building||exporting)return;
+  const key=top?'topCustomProfile':'customProfile';
+  editStrandPolygon(rectangles[key],top?'Top strand polygon':'Bottom strand polygon',points=>{
+    const recipe=validateRectangles({...rectangles,[key]:points});
+    Object.assign(rectangles,recipe);pane.refresh();showFolders();settingsChanged();
+  });
+}
 const topShapeOptions={
   get section(){return rectangles.topSection??'same';},
   set section(value:string){rectangles.topSection=value==='same'?undefined:value as RectangleRecipe['section'];},
@@ -578,16 +587,20 @@ rectangleShape.addBinding(rectangles,'strandSpacing',{label:'Strand spacing',opt
   .element.querySelector('select')?.setAttribute('aria-label','Strand spacing');
 parameterHint(rectangleShape,'Equal distance divides the nominal outline perimeter evenly. Turns and waves then travel along that perimeter: 360° is one circuit. Random offsets can change the spacing.');
 const bottomSectionFolder=rectangleShape.addFolder({title:'Strand bottom',expanded:true});
-bottomSectionFolder.addBinding(rectangles,'section',{label:'Bottom cross-section',options:{Rectangle:'rectangle',Diamond:'diamond',Triangle:'triangle',Hexagon:'hexagon',Circle:'circle',Ellipse:'ellipse'}})
+bottomSectionFolder.addBinding(rectangles,'section',{label:'Bottom cross-section',options:{Rectangle:'rectangle',Diamond:'diamond',Triangle:'triangle',Hexagon:'hexagon',Circle:'circle',Ellipse:'ellipse','Custom polygon':'custom'}})
   .element.querySelector('select')?.setAttribute('aria-label','Bottom cross-section');
+const bottomPolygonButton=bottomSectionFolder.addButton({title:'Edit bottom polygon…'});
+bottomPolygonButton.on('click',()=>editCustomSection(false));
 dimension(bottomSectionFolder,'width','Bottom width · mm',.1);
 dimension(bottomSectionFolder,'depth','Bottom depth · mm',.5);
 const perimeterSizing=bottomSectionFolder.addBinding(rectangles,'scaleWithPerimeter',{label:'Scale with outline perimeter'});
 perimeterSizing.element.querySelector('input')?.setAttribute('aria-label','Scale with outline perimeter');
 const perimeterSizingHelp=parameterHint(bottomSectionFolder,'Automatic sizing multiplies the bottom dimensions by each level’s perimeter / bottom perimeter. It replaces manual top dimensions and preserves the size-to-spacing ratio, not exact physical overlap.');
 const topSectionFolder=rectangleShape.addFolder({title:'Strand top',expanded:true});
-const topSectionBinding=topSectionFolder.addBinding(topShapeOptions,'section',{label:'Top cross-section',options:{'Same as bottom':'same',Rectangle:'rectangle',Diamond:'diamond',Triangle:'triangle',Hexagon:'hexagon',Circle:'circle',Ellipse:'ellipse'}});
+const topSectionBinding=topSectionFolder.addBinding(topShapeOptions,'section',{label:'Top cross-section',options:{'Same as bottom':'same',Rectangle:'rectangle',Diamond:'diamond',Triangle:'triangle',Hexagon:'hexagon',Circle:'circle',Ellipse:'ellipse','Custom polygon':'custom'}});
 topSectionBinding.element.querySelector('select')?.setAttribute('aria-label','Top cross-section');
+const topPolygonButton=topSectionFolder.addButton({title:'Edit top polygon…'});
+topPolygonButton.on('click',()=>editCustomSection(true));
 const taperToggle=topSectionFolder.addBinding(rectangles,'taperSection',{label:'Set different top dimensions'});
 taperToggle.element.querySelector('input')?.setAttribute('aria-label','Set different top dimensions');
 dimension(topSectionFolder,'topWidth','Top width · mm',.1);
@@ -716,6 +729,8 @@ for(const [key,label] of [['inset','Cavity radial inset · mm'],['floor','Cavity
 const cavityHelp=document.createElement('p');cavityHelp.className='parameter-hint';
 enableCavity.element.parentElement!.appendChild(cavityHelp);
 function showFolders() {
+  bottomPolygonButton.hidden=rectangles.section!=='custom';
+  topPolygonButton.hidden=rectangles.topSection!=='custom';
   const thicknessMode=rectangles.thicknessModulation??'none',thicknessOn=thicknessMode!=='none';
   thicknessBindings.forEach(b=>b.hidden=!thicknessOn);
   const thicknessLabel=thicknessMode==='sineSquared'?'Thickness amplitude · +%':'Thickness amplitude · ±%';

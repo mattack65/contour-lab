@@ -4,6 +4,8 @@ A local, browser-based tool for designing parametric sculptures, vases and lamps
 
 Strand thickness can follow the outline perimeter and vary with sine, sine-squared or triangle waves, optionally alternating between neighbours. Fixed centre paths let strands grow without shifting their centres.
 
+Custom strand cross-sections can be drawn in **Edit structure > Custom polygon > Edit polygon**. Drag, add or delete corners; outward points down and the sculpture centre is above. Shapes are saved with recipes. Concave outlines work with the same shape at both ends; blending between different end shapes requires convex polygons containing their bounding-box centre.
+
 An experimental personal project, shared as-is. No support or maintenance commitments.
 
 | Standard light 1 · real print | Standard light 2 · real print |

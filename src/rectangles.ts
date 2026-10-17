@@ -1,10 +1,12 @@
+import {defaultCustomProfile,validateCustomProfile,supportsProfileTransition} from './custom-profile.ts';
+import type {ProfilePoint} from './custom-profile.ts';
 import {hasThicknessModulation, thicknessScaleAt, thicknessMaximumScale, thicknessSamplingStep, thicknessKnots} from './strand-thickness.ts';
 import {outlineTravel} from './outline-travel.ts';
 import {centerAt,hasMovingCenters,CENTER_LIMIT} from './centreline.ts';
 import {adaptiveStations} from './adaptive-sampling.ts';
 import { pathAngle, pathDerivativeBounds, pathKnots } from './path-motion.ts';
 import { morphProfile, smoothTransition, outlineGauge, outlineMorphPoints } from './shape-transition.ts';
-import { BufferGeometry, Float32BufferAttribute } from 'three';
+import { BufferGeometry, Float32BufferAttribute, ShapeUtils, Vector2 } from 'three';
 
 export interface BulgePoint {
   centerX?: number;
@@ -33,7 +35,9 @@ export interface RectangleRecipe {
   count: number;
   width: number;
   depth: number;
-  section: 'rectangle' | 'diamond' | 'triangle' | 'hexagon' | 'circle' | 'ellipse';
+  section: 'rectangle' | 'diamond' | 'triangle' | 'hexagon' | 'circle' | 'ellipse' | 'custom';
+  customProfile?: ProfilePoint[];
+  topCustomProfile?: ProfilePoint[];
   topSection?: RectangleRecipe['section'];
   topOutline?: RectangleRecipe['outline'];
   sectionSides: number;
@@ -90,7 +94,7 @@ export const rectangleDefaults: RectangleRecipe = {
   bottomCenterX: undefined, bottomCenterY: undefined, topCenterX: undefined, topCenterY: undefined,
   strandSpacing: 'angle', strandPlacement: 'inside', scaleWithPerimeter: false,
   thicknessModulation: 'none', thicknessAmplitude: 30, thicknessCycles: 1, alternateThickness: false,
-  topSection: undefined, topOutline: undefined,
+  topSection: undefined, topOutline: undefined, customProfile: undefined, topCustomProfile: undefined,
   smoothCavity: undefined,
   bulgePoints: undefined,
   count: 36, width: 1, depth: 10, diameter: 200, topDiameter: 200, height: 200, twist: 0, orbitTwist: 90, alternateOrbit: false, layerHeight: 0.2,
@@ -211,12 +215,19 @@ export function validateRectangles(value: unknown): RectangleRecipe {
   if (!['circle','square','rectangle','ellipse','hexagon'].includes(outline as string)) throw new Error('Unknown overall outline.');
   result.outline = outline as RectangleRecipe['outline'];
   const section = source.section ?? 'rectangle';
-  if (!['rectangle','diamond','triangle','hexagon','circle','ellipse'].includes(section as string)) throw new Error('Unknown plank cross-section.');
+  if (!['rectangle','diamond','triangle','hexagon','circle','ellipse','custom'].includes(section as string)) throw new Error('Unknown plank cross-section.');
   result.section = section as RectangleRecipe['section'];
-  for (const [key,allowed] of [['topSection',['rectangle','diamond','triangle','hexagon','circle','ellipse']],['topOutline',['circle','square','rectangle','ellipse','hexagon']]] as const) {
+  for (const [key,allowed] of [['topSection',['rectangle','diamond','triangle','hexagon','circle','ellipse','custom']],['topOutline',['circle','square','rectangle','ellipse','hexagon']]] as const) {
     const v=source[key];
     if(v!==undefined && !(allowed as readonly unknown[]).includes(v))throw new Error(`Unknown ${key==='topSection'?'top strand shape':'top outline'}.`);
     (result as unknown as Record<string,unknown>)[key]=v;
+  }
+  for(const key of ['customProfile','topCustomProfile'] as const)
+    result[key]=source[key]===undefined?undefined:validateCustomProfile(source[key],key==='customProfile'?'Bottom polygon':'Top polygon');
+  if(hasSectionTransition(result)) {
+    for(const [shape,points,label] of [[result.section,result.customProfile,'Bottom'],[result.topSection,result.topCustomProfile,'Top']] as const)
+      if(shape==='custom'&&!supportsProfileTransition(points??defaultCustomProfile))
+        throw new Error(`${label} custom polygon cannot blend into another end shape: use a convex polygon containing its bounding-box centre, or choose “Same as bottom”. Inward corners work when the same polygon is used along the strand.`);
   }
   const taperSection = source.taperSection ?? false;
   if (typeof taperSection !== 'boolean') throw new Error('Taper plank section must be true or false.');
@@ -498,7 +509,7 @@ export function rectangleClearance(recipe: RectangleRecipe, sampleStep = recipe.
   if(recipe.strandPlacement==='fixed'||recipe.scaleWithPerimeter || hasThicknessModulation(recipe))return -1;
   // The circular separation proof does not cover changing radial distances at
   // polygon corners. Route those outlines through the checked Boolean union.
-  if ((recipe.motion==='wander' && recipe.wanderAmplitude!==0) || hasPhaseShift(recipe) || hasSectionTransition(recipe) || hasOutlineY(recipe) || hasOutlineTransition(recipe) || hasRandomOffsets(recipe) || (recipe.outline && recipe.outline !== 'circle')) return -1;
+  if (recipe.section==='custom' || (recipe.motion==='wander' && recipe.wanderAmplitude!==0) || hasPhaseShift(recipe) || hasSectionTransition(recipe) || hasOutlineY(recipe) || hasOutlineTransition(recipe) || hasRandomOffsets(recipe) || (recipe.outline && recipe.outline !== 'circle')) return -1;
   const maximum = maximumSection(recipe);
   const centre = edgeAtDiameter({...recipe,width:maximum.width}, rectangleDiameterRange(recipe).min) - maximum.depth / 2;
   // Interpolated mesh rings follow chords; use their smallest centre radius too.
@@ -507,7 +518,7 @@ export function rectangleClearance(recipe: RectangleRecipe, sampleStep = recipe.
 }
 
 // Convex, counterclockwise sections in a unit depth × width bounding box.
-const sections: Record<RectangleRecipe['section'], [number,number][]> = {
+const sections: Record<Exclude<RectangleRecipe['section'],'custom'>, [number,number][]> = {
   rectangle: [[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]],
   diamond: [[-.5,0],[0,-.5],[.5,0],[0,.5]],
   triangle: [[-.5,-.5],[.5,0],[-.5,.5]],
@@ -518,9 +529,12 @@ const sections: Record<RectangleRecipe['section'], [number,number][]> = {
 
 // Cache unit profiles: outline placement and every height ring share these points.
 const roundSections = new Map<number, [number,number][]>([[32,sections.circle]]);
-export function hasSectionTransition(recipe:RectangleRecipe) { return !!recipe.topSection && recipe.topSection!==recipe.section; }
+export function hasSectionTransition(recipe:RectangleRecipe) {
+  return !!recipe.topSection&&(recipe.topSection!==recipe.section||(recipe.section==='custom'&&JSON.stringify(recipe.customProfile??defaultCustomProfile)!==JSON.stringify(recipe.topCustomProfile??defaultCustomProfile)));
+}
 export function hasOutlineTransition(recipe:RectangleRecipe) { return !!recipe.topOutline && recipe.topOutline!==recipe.outline; }
 function fixedStrandSection(recipe: RectangleRecipe): [number,number][] {
+  if(recipe.section==='custom')return recipe.customProfile??defaultCustomProfile;
   if (recipe.section !== 'circle' && recipe.section !== 'ellipse') return sections[recipe.section ?? 'rectangle'];
   const sides=recipe.sectionSides ?? 32;
   let points=roundSections.get(sides);
@@ -537,7 +551,7 @@ function strandSection(recipe:RectangleRecipe,z=0):[number,number][] {
   if(!cache){cache=new Map();sectionTransitionCache.set(recipe,cache);}
   let points=cache.get(z);
   if(!points){
-    points=morphProfile(fixedStrandSection(recipe),fixedStrandSection({...recipe,section:recipe.topSection!}),smoothTransition(z/recipe.height));
+    points=morphProfile(fixedStrandSection(recipe),fixedStrandSection({...recipe,section:recipe.topSection!,customProfile:recipe.topCustomProfile}),smoothTransition(z/recipe.height));
     cache.set(z,points);
   }
   return points;
@@ -723,7 +737,7 @@ function nominalCentre(recipe: RectangleRecipe,angle: number,z: number,index=0):
     ...recipe,strandPlacement:'inside',scaleWithPerimeter:false,thicknessModulation:'none',
     taperSection:false,topSection:undefined,
   },angle,z,index);
-  return !recipe.scaleWithPerimeter && !hasOutlineY(recipe) && !hasOutlineTransition(recipe) && !hasSectionTransition(recipe) && (!recipe.outline || recipe.outline==='circle') && recipe.section!=='circle' && recipe.section!=='ellipse'
+  return !recipe.scaleWithPerimeter && !hasOutlineY(recipe) && !hasOutlineTransition(recipe) && !hasSectionTransition(recipe) && (!recipe.outline || recipe.outline==='circle') && recipe.section!=='circle' && recipe.section!=='ellipse' && recipe.section!=='custom'
     ? outerEdge(recipe,z,index)-sectionSizeAt(recipe,z,index).depth/2 : outlineCentre(recipe,angle,z,index);
 }
 
@@ -782,7 +796,7 @@ export type RectangleQuality = 'preview' | 'export';
 export function rectangleSamplingStep(recipe: RectangleRecipe, quality: RectangleQuality): number {
   if (quality === 'export') return Math.min(recipe.layerHeight,thicknessSamplingStep(recipe));
   if (recipe.strandPlacement==='fixed'||hasThicknessModulation(recipe))return Math.min(outlinePreviewStep(recipe),thicknessSamplingStep(recipe));
-  if (recipe.scaleWithPerimeter || recipe.strandSpacing==='perimeter' || hasMovingCenters(recipe) || hasOutlineY(recipe) || hasSectionTransition(recipe) || hasOutlineTransition(recipe) || recipe.section==='ellipse' || hasRandomOffsets(recipe) || (recipe.outline && recipe.outline !== 'circle')) return outlinePreviewStep(recipe);
+  if (recipe.scaleWithPerimeter || recipe.strandSpacing==='perimeter' || hasMovingCenters(recipe) || hasOutlineY(recipe) || hasSectionTransition(recipe) || hasOutlineTransition(recipe) || recipe.section==='ellipse' || recipe.section==='custom' || hasRandomOffsets(recipe) || (recipe.outline && recipe.outline !== 'circle')) return outlinePreviewStep(recipe);
   const rate = orbitRateBound(recipe);
   const acceleration = pathDerivativeBounds(recipe).acceleration * Math.PI / 180 / recipe.height ** 2;
   const twistRate = Math.abs(recipe.twist) * Math.PI / 180 / recipe.height;
@@ -824,7 +838,7 @@ function outlinePreviewStep(recipe: RectangleRecipe): number {
 
 function needsLocalPreview(recipe:RectangleRecipe) {
   return recipe.strandPlacement==='fixed'||hasThicknessModulation(recipe)||recipe.scaleWithPerimeter||recipe.strandSpacing==='perimeter'||hasMovingCenters(recipe)||hasOutlineY(recipe)||hasSectionTransition(recipe)||hasOutlineTransition(recipe)
-    ||recipe.section==='ellipse'||hasRandomOffsets(recipe)||recipe.outline!=='circle';
+    ||recipe.section==='ellipse'||recipe.section==='custom'||hasRandomOffsets(recipe)||recipe.outline!=='circle';
 }
 
 /** Capped swept rectangles; straight prisms need only two rings at either quality. */
@@ -874,6 +888,9 @@ export function generateRectangles(input: RectangleRecipe, options: { quality?: 
   const steps = heights.length-1,sides=strandSection(recipe).length;
   const sharedRings=recipe.scaleWithPerimeter||recipe.strandSpacing==='perimeter';
   const stride=(steps+1)*sides+(hasSectionTransition(recipe)?2:0);
+  // Concave outlines need polygon triangulation; a fan would fill their notches.
+  const customCaps=recipe.section==='custom'&&!hasSectionTransition(recipe)
+    ?ShapeUtils.triangulateShape(strandSection(recipe).map(([x,y])=>new Vector2(x,y)),[]):undefined;
   if(sharedRings) {
     positions.length=recipe.count*stride*3;
     for(let layer=0;layer<=steps;layer++)for(let i=0;i<recipe.count;i++) {
@@ -898,6 +915,11 @@ export function generateRectangles(input: RectangleRecipe, options: { quality?: 
           const a=offset+row*sides+j,b=offset+row*sides+(j+1)%sides;
           if(up)indices.push(cap,a,b);else indices.push(cap,b,a);
         }
+      }
+    } else if(customCaps) {
+      for(const [a,b,c] of customCaps) {
+        indices.push(offset+c,offset+b,offset+a);
+        indices.push(offset+top+a,offset+top+b,offset+top+c);
       }
     } else {
       for (let j = 1; j < sides-1; j++) indices.push(offset,offset+j+1,offset+j);

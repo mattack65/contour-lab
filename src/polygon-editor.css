@@ -1,0 +1,13 @@
+.polygon-editor{width:min(830px,94vw);max-height:92vh;box-sizing:border-box;overflow:auto;border:1px solid #91a07f;border-radius:12px;padding:22px;background:#f8f7f2;color:#293624;font:16px/1.4 system-ui;box-shadow:0 20px 80px #0005}
+.polygon-editor::backdrop{background:#18201388}
+.polygon-editor header,.polygon-editor footer{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.polygon-editor footer{height:auto;padding:14px 0 0;font:16px/1.4 system-ui;letter-spacing:normal;color:inherit}.polygon-workspace aside{padding:0;border:0;background:transparent}
+.polygon-editor h2{margin:0;font-size:23px}.polygon-editor h3{font-size:17px;margin:12px 0}
+.polygon-editor p{font-size:14px}.polygon-editor button,.polygon-editor input,.polygon-editor select{font:inherit;padding:8px;border:1px solid #a2ad98;border-radius:5px;background:#fff;color:inherit}
+.polygon-editor button{cursor:pointer}.polygon-editor button:disabled{opacity:.45;cursor:default}.polygon-editor button[data-apply]{background:#506e39;color:white}
+.polygon-workspace{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(210px,1fr);gap:20px;align-items:start}.polygon-workspace svg{width:100%;touch-action:none;user-select:none;background:white;border:1px solid #d6dbce;border-radius:8px}
+.polygon-workspace aside{display:grid;gap:8px}.polygon-workspace label{display:grid;grid-template-columns:1fr 100px;gap:8px;align-items:center}.polygon-workspace input{width:100%;box-sizing:border-box}
+.polygon-grid{stroke:#e8ece2;stroke-width:1}.polygon-axis{stroke:#aab89b;stroke-dasharray:4 4}.polygon-fill{fill:#dce8c9;stroke:#54713d;stroke-width:2}.polygon-edge{stroke:transparent;stroke-width:13;cursor:copy}.polygon-corner{fill:#fff;stroke:#54713d;stroke-width:2;cursor:grab}.polygon-corner.selected{fill:#54713d}.polygon-workspace text{font:12px system-ui;fill:#57664b;pointer-events:none}.polygon-error{color:#b63214!important}
+@media(max-width:650px){.polygon-workspace{grid-template-columns:1fr}.polygon-editor{padding:14px}.polygon-workspace svg{max-height:45vh}}
+
+.polygon-workspace text.polygon-direction{font:600 14px system-ui;fill:#405c2c}
