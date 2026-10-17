@@ -1,3 +1,4 @@
+import {hasThicknessModulation, thicknessScaleAt, thicknessMaximumScale, thicknessSamplingStep, thicknessKnots} from './strand-thickness.ts';
 import {outlineTravel} from './outline-travel.ts';
 import {centerAt,hasMovingCenters,CENTER_LIMIT} from './centreline.ts';
 import {adaptiveStations} from './adaptive-sampling.ts';
@@ -23,7 +24,12 @@ export interface RectangleRecipe {
   bottomProportionsLocked?: boolean;
   topProportionsLocked?: boolean;
   strandSpacing?: 'angle' | 'perimeter';
+  strandPlacement?: 'inside' | 'fixed';
   scaleWithPerimeter?: boolean;
+  thicknessModulation?: 'none' | 'sine' | 'sineSquared' | 'triangle';
+  thicknessAmplitude?: number;
+  thicknessCycles?: number;
+  alternateThickness?: boolean;
   count: number;
   width: number;
   depth: number;
@@ -82,7 +88,8 @@ export interface RectangleRecipe {
 
 export const rectangleDefaults: RectangleRecipe = {
   bottomCenterX: undefined, bottomCenterY: undefined, topCenterX: undefined, topCenterY: undefined,
-  strandSpacing: 'angle', scaleWithPerimeter: false,
+  strandSpacing: 'angle', strandPlacement: 'inside', scaleWithPerimeter: false,
+  thicknessModulation: 'none', thicknessAmplitude: 30, thicknessCycles: 1, alternateThickness: false,
   topSection: undefined, topOutline: undefined,
   smoothCavity: undefined,
   bulgePoints: undefined,
@@ -100,6 +107,7 @@ export const rectangleDefaults: RectangleRecipe = {
 };
 export const sineDefaults: RectangleRecipe = { ...rectangleDefaults, motion: 'sine', alternateOrbit: true };
 export const rectangleLimits = {
+  thicknessAmplitude: [0, 95], thicknessCycles: [.25, 12],
   sectionSides: [8, 128], count: [3, 512], width: [0.4, 40], depth: [1, 40], diameter: [0, 280], topDiameter: [0, 280],
   bottomSizeY: [0, 280], topSizeY: [0, 280],
   topInset: [-80, 80], insetSeed: [0, 999999], bottomInset: [-80, 80], bottomInsetSeed: [0, 999999],
@@ -133,6 +141,16 @@ export function validateRectangles(value: unknown): RectangleRecipe {
   if(spacing!=='angle'&&spacing!=='perimeter')throw new Error('Unknown strand spacing.');
   if(typeof scaling!=='boolean')throw new Error('Scale with outline perimeter must be true or false.');
   result.strandSpacing=spacing;result.scaleWithPerimeter=scaling;
+  const placement=source.strandPlacement??'inside';
+  if(placement!=='inside'&&placement!=='fixed')throw new Error('Unknown strand centre placement.');
+  result.strandPlacement=placement;
+  // The briefly available random modifier is retired; preserve all other recipe settings.
+  const thicknessMode=source.thicknessModulation==='random'?'none':source.thicknessModulation??'none';
+  if(!['none','sine','sineSquared','triangle'].includes(thicknessMode as string))throw new Error('Unknown strand thickness modulation.');
+  result.thicknessModulation=thicknessMode as RectangleRecipe['thicknessModulation'];
+  const alternateThickness=source.alternateThickness??false;
+  if(typeof alternateThickness!=='boolean')throw new Error('Alternate thickness phase must be on or off.');
+  result.alternateThickness=alternateThickness;
   result.smoothCavity=undefined;
   if(source.smoothCavity!==undefined) {
     const cavity=source.smoothCavity as {inset:number;floor:number;repairInset?:number;fillPockets?:boolean};
@@ -205,7 +223,7 @@ export function validateRectangles(value: unknown): RectangleRecipe {
   result.taperSection = taperSection;
   for (const key of Object.keys(rectangleLimits) as (keyof typeof rectangleLimits)[]) {
     const raw = (value as Record<string, unknown>)[key];
-    const legacyDefault = key === 'bottomSizeY' ? source.diameter : key === 'topSizeY' ? (source.topDiameter ?? source.diameter) : key === 'topWidth' ? source.width : key === 'topDepth' ? source.depth : key === 'topDiameter' ? source.diameter : ['twistSeed','turnPower','waveEndCycles','wanderAmplitude','wanderBends','wanderSeed','sectionSides','waveAmplitude','waveCycles','discHole','discThickness','bulge','bulgeLower','bulgeUpper','phaseTurns','topInset','insetSeed','bottomInset','bottomInsetSeed'].includes(key)
+    const legacyDefault = key === 'bottomSizeY' ? source.diameter : key === 'topSizeY' ? (source.topDiameter ?? source.diameter) : key === 'topWidth' ? source.width : key === 'topDepth' ? source.depth : key === 'topDiameter' ? source.diameter : ['thicknessAmplitude','thicknessCycles','twistSeed','turnPower','waveEndCycles','wanderAmplitude','wanderBends','wanderSeed','sectionSides','waveAmplitude','waveCycles','discHole','discThickness','bulge','bulgeLower','bulgeUpper','phaseTurns','topInset','insetSeed','bottomInset','bottomInsetSeed'].includes(key)
       ? rectangleDefaults[key] : (key === 'twist' || key === 'orbitTwist') ? 0 : undefined;
     const n = raw === undefined ? (legacyDefault ?? (['middleInset','middleInsetSeed','lowerInset','lowerInsetSeed','upperInset','upperInsetSeed','topTangential','topTangentialSeed','bottomTangential','bottomTangentialSeed'].includes(key) ? rectangleDefaults[key] : undefined)) : raw;
     const [min, max] = rectangleLimits[key];
@@ -245,6 +263,7 @@ export function validateRectangles(value: unknown): RectangleRecipe {
   for(const key of ['middleInsetSeed','lowerInsetSeed','upperInsetSeed','topTangentialSeed','bottomTangentialSeed'] as const)
     if(!Number.isInteger(result[key]))throw new Error(`${key} must be a whole number.`);
   if ((alternate || result.alternateTwist) && result.count % 2 !== 0) throw new Error('Use an even plank count to alternate directions all the way around.');
+  if(hasThicknessModulation(result)&&result.alternateThickness&&result.count%2!==0)throw new Error('Use an even strand count for alternating thickness phases around the entire outline.');
   const envelope = rectangleDiameterRange(result);
   const xError=outlineProfileError('X',envelope);if(xError)throw new Error(xError);
   if (hasOutlineY(result)) {
@@ -253,11 +272,16 @@ export function validateRectangles(value: unknown): RectangleRecipe {
   }
   const maximum = maximumSection(result);
   const inner = edgeAtDiameter({...result,width:maximum.width}, outlineInscribedDiameter(result)) - maximum.depth;
-  if(result.scaleWithPerimeter) {
+  if(result.strandPlacement==='fixed'||result.scaleWithPerimeter || hasThicknessModulation(result)) {
     const heights=[...Array.from({length:129},(_,i)=>result.height*i/128),...editableBulgePoints(result).map(p=>p.height/100*result.height)];
-    for(const z of heights){const size=sectionSizeAt(result,z),d=outlineInscribedDiameter(result,z,z);
+    for(const z of heights){const baseSize=baseSectionSizeAt(result,z),factor=thicknessMaximumScale(result),size={width:baseSize.width*factor,depth:baseSize.depth*factor},d=outlineInscribedDiameter(result,z,z);
+      if(result.strandPlacement==='fixed') {
+        const anchorDepth=result.section==='circle'?result.width:result.depth;
+        if(result.width>=d || edgeAtDiameter(result,d)<=anchorDepth)
+          throw new Error(`Fixed strand centres cannot fit the bottom strand profile near height ${Number(z.toFixed(2))} mm. Reduce the bottom strand dimensions, widen this level, or choose Fit inside outline.`);
+      }
       if(!Number.isFinite(size.width)||!Number.isFinite(size.depth)||size.width>=d||edgeAtDiameter({...result,width:size.width},d)<=size.depth)
-        throw new Error(`Scaled strands are too large for the outline near height ${Number(z.toFixed(2))} mm. Reduce the bottom strand dimensions or widen that part of the outline.`);
+        throw new Error(`Scaled strands are too large for the outline near height ${Number(z.toFixed(2))} mm. Reduce the strand dimensions or thickness-wave amplitude, or widen that part of the outline.`);
     }
   } else if (inner <= 0) throw new Error('Reduce the depth or increase the diameter to keep rectangles outside the centre.');
   if (result.bottomDisc) {
@@ -266,8 +290,9 @@ export function validateRectangles(value: unknown): RectangleRecipe {
       throw new Error('Reduce the plate thickness: random bulge points must sit above the plate.');
     if(result.discHole>0) {
     if (result.discHole >= outlineInscribedDiameter(result,0,0)) throw new Error('The centre hole must fit inside the bottom outline.');
-    const low = sectionSizeAt(result,result.discThickness/2), high = sectionSizeAt(result,result.discThickness);
-    const width = Math.max(low.width,high.width), depth = Math.max(low.depth,high.depth);
+    const low = baseSectionSizeAt(result,result.discThickness/2), high = baseSectionSizeAt(result,result.discThickness);
+    const factor=thicknessMaximumScale(result);
+    const width = Math.max(low.width,high.width)*factor, depth = Math.max(low.depth,high.depth)*factor;
     let clearRadius = edgeAtDiameter({...result,width}, outlineInscribedDiameter(result, result.discThickness / 2, result.discThickness))
       - depth / 2 - Math.hypot(depth,width) / 2;
     if(result.bottomInset>0) {
@@ -295,7 +320,8 @@ export function strandPerimeterScaleAt(recipe: RectangleRecipe, z: number) {
     ? outlinePerimeterAt(recipe,z)/outlinePerimeterAt(recipe,0) : 1;
 }
 
-export function sectionSizeAt(recipe: RectangleRecipe, z: number) {
+/** Base dimensions before per-strand modifiers; also used for UI summaries. */
+export function baseSectionSizeAt(recipe: RectangleRecipe, z: number) {
   const t=Math.max(0,Math.min(1,z/recipe.height));
   if(recipe.scaleWithPerimeter) {
     const scale=strandPerimeterScaleAt(recipe,z);
@@ -314,13 +340,20 @@ export function sectionSizeAt(recipe: RectangleRecipe, z: number) {
   return {width,depth:recipe.section==='circle'?width:recipe.depth+(recipe.taperSection?(recipe.topDepth-recipe.depth)*t:0)};
 }
 
+/** Modifiers compose multiplicatively after taper, perimeter sizing and shape morph. */
+export function sectionSizeAt(recipe: RectangleRecipe, z: number, index=0) {
+  const base=baseSectionSizeAt(recipe,z),scale=thicknessScaleAt(recipe,z,index);
+  return scale===1?base:{width:base.width*scale,depth:base.depth*scale};
+}
+
 function maximumSection(recipe: RectangleRecipe) {
+  const scale=thicknessMaximumScale(recipe);
   if(recipe.scaleWithPerimeter) {
-    const sizes=Array.from({length:129},(_,i)=>sectionSizeAt(recipe,recipe.height*i/128));
-    return {width:Math.max(...sizes.map(s=>s.width)),depth:Math.max(...sizes.map(s=>s.depth))};
+    const sizes=Array.from({length:129},(_,i)=>baseSectionSizeAt(recipe,recipe.height*i/128));
+    return {width:scale*Math.max(...sizes.map(s=>s.width)),depth:scale*Math.max(...sizes.map(s=>s.depth))};
   }
-  const bottom=sectionSizeAt(recipe,0),top=sectionSizeAt(recipe,recipe.height);
-  return {width:Math.max(bottom.width,top.width),depth:Math.max(bottom.depth,top.depth)};
+  const bottom=baseSectionSizeAt(recipe,0),top=baseSectionSizeAt(recipe,recipe.height);
+  return {width:scale*Math.max(bottom.width,top.width),depth:scale*Math.max(bottom.depth,top.depth)};
 }
 
 /** Circular displacement in degrees. Anchor each phase at zero at the base. */
@@ -450,10 +483,10 @@ function radiusDerivativeBounds(recipe: RectangleRecipe) {
 }
 
 // Both outer corners touch the circle. A tangent outer edge would put them outside it.
-function outerEdge(recipe: RectangleRecipe, z = 0): number {
+function outerEdge(recipe: RectangleRecipe, z = 0, index=0): number {
   const diameter = rectangleDiameterAt(recipe,z);
   return !recipe.section || recipe.section === 'rectangle'
-    ? edgeAtDiameter({...recipe,width:sectionSizeAt(recipe,z).width},diameter) : diameter/2;
+    ? edgeAtDiameter({...recipe,width:sectionSizeAt(recipe,z,index).width},diameter) : diameter/2;
 }
 
 function edgeAtDiameter(recipe: RectangleRecipe, diameter: number): number {
@@ -462,7 +495,7 @@ function edgeAtDiameter(recipe: RectangleRecipe, diameter: number): number {
 
 /** Conservative minimum gap between the swept disks of adjacent planks, in mm. */
 export function rectangleClearance(recipe: RectangleRecipe, sampleStep = recipe.layerHeight): number {
-  if(recipe.scaleWithPerimeter)return -1;
+  if(recipe.strandPlacement==='fixed'||recipe.scaleWithPerimeter || hasThicknessModulation(recipe))return -1;
   // The circular separation proof does not cover changing radial distances at
   // polygon corners. Route those outlines through the checked Boolean union.
   if ((recipe.motion==='wander' && recipe.wanderAmplitude!==0) || hasPhaseShift(recipe) || hasSectionTransition(recipe) || hasOutlineY(recipe) || hasOutlineTransition(recipe) || hasRandomOffsets(recipe) || (recipe.outline && recipe.outline !== 'circle')) return -1;
@@ -580,12 +613,12 @@ export function strandAngleAt(recipe:RectangleRecipe,index:number,z:number) {
 /** Move a rigid, untwisted section outward until a vertex reaches the outline.
  * All vertices stay inside the convex boundary. Own-axis twist is applied later,
  * preserving the same interpretation as the original circular implementation. */
-function outlineCentre(recipe: RectangleRecipe, angle: number, z: number): number {
-  const {x,y}=outlineSizeAt(recipe,z), size=sectionSizeAt(recipe,z);
+function outlineCentre(recipe: RectangleRecipe, angle: number, z: number, index=0): number {
+  const {x,y}=outlineSizeAt(recipe,z), size=sectionSizeAt(recipe,z,index);
   const c=Math.cos(angle),s=Math.sin(angle);
   const offsets=strandSection(recipe,z).map(([u,v])=>[u*size.depth*c-v*size.width*s,u*size.depth*s+v*size.width*c]);
   let centre=Infinity;
-  if(recipe.scaleWithPerimeter) {
+  if(recipe.scaleWithPerimeter || hasThicknessModulation(recipe)) {
     const t=smoothTransition(z/recipe.height);
     if(offsets.some(([u,v])=>(1-t)*outlineGauge(recipe.outline,u/x,v/y)+t*outlineGauge(recipe.topOutline??recipe.outline,u/x,v/y)>1))
       throw new Error(`Scaled strand section does not fit at height ${Number(z.toFixed(2))} mm. Reduce the bottom strand dimensions or widen the outline.`);
@@ -682,9 +715,16 @@ export function plankInsetAt(recipe: RectangleRecipe,index: number,angle: number
   return Math.abs(recipe.bottomInset??0)>0 ? top+plankInsetFraction(recipe,index,'bottom')*radius*(1-t*t*(3-2*t)) : top;
 }
 
-function nominalCentre(recipe: RectangleRecipe,angle: number,z: number): number {
+/** Centre path uses the bottom profile as its fixed inset reference. The outline,
+ * travel and random offsets still vary normally; thickness, taper and section morph
+ * do not reposition the path. Older recipes retain the original fitted placement. */
+function nominalCentre(recipe: RectangleRecipe,angle: number,z: number,index=0): number {
+  if(recipe.strandPlacement==='fixed')return nominalCentre({
+    ...recipe,strandPlacement:'inside',scaleWithPerimeter:false,thicknessModulation:'none',
+    taperSection:false,topSection:undefined,
+  },angle,z,index);
   return !recipe.scaleWithPerimeter && !hasOutlineY(recipe) && !hasOutlineTransition(recipe) && !hasSectionTransition(recipe) && (!recipe.outline || recipe.outline==='circle') && recipe.section!=='circle' && recipe.section!=='ellipse'
-    ? outerEdge(recipe,z)-sectionSizeAt(recipe,z).depth/2 : outlineCentre(recipe,angle,z);
+    ? outerEdge(recipe,z,index)-sectionSizeAt(recipe,z,index).depth/2 : outlineCentre(recipe,angle,z,index);
 }
 
 /** Signed translation perpendicular to the radial direction; 100% is one
@@ -697,7 +737,7 @@ export function plankTangentialAt(recipe: RectangleRecipe,index: number,angle: n
   const fraction=bottom*(1-s)+top*s;
   if(recipe.strandSpacing==='perimeter')return fraction*outlinePerimeterAt(recipe,z)/recipe.count;
   const pitch=2*Math.PI/recipe.count,neighborAngle=angle+pitch;
-  const a=nominalCentre(recipe,angle,z),b=nominalCentre(recipe,neighborAngle,z);
+  const a=nominalCentre(recipe,angle,z,index),b=nominalCentre(recipe,neighborAngle,z,(index+1)%recipe.count);
   const spacing=Math.hypot(b*Math.cos(neighborAngle)-a*Math.cos(angle),b*Math.sin(neighborAngle)-a*Math.sin(angle));
   return fraction*spacing;
 }
@@ -713,9 +753,8 @@ export function strandTwist(recipe: RectangleRecipe, index: number): number {
 export function rectangleCorners(recipe: RectangleRecipe, index: number, z = 0): [number, number][] {
   const angle = strandAngleAt(recipe,index,z);
   const c = Math.cos(angle), s = Math.sin(angle);
-  const size = sectionSizeAt(recipe,z);
-  let centre = !recipe.scaleWithPerimeter && !hasOutlineY(recipe) && !hasOutlineTransition(recipe) && !hasSectionTransition(recipe) && (!recipe.outline || recipe.outline === 'circle') && recipe.section!=='circle' && recipe.section!=='ellipse'
-    ? outerEdge(recipe, z) - size.depth / 2 : outlineCentre(recipe,angle,z);
+  const size = sectionSizeAt(recipe,z,index);
+  let centre = nominalCentre(recipe,angle,z,index);
   if (hasRandomOffsets(recipe)) centre-=plankInsetAt(recipe,index,angle,z);
   const tangent=plankTangentialAt(recipe,index,angle,z);
   const turn = strandTwist(recipe,index) * Math.PI / 180 * z / recipe.height;
@@ -741,7 +780,8 @@ export type RectangleQuality = 'preview' | 'export';
  * The second-derivative bound includes circular motion and own-axis rotation.
  * Export always retains the requested layer step, without altering the recipe. */
 export function rectangleSamplingStep(recipe: RectangleRecipe, quality: RectangleQuality): number {
-  if (quality === 'export') return recipe.layerHeight;
+  if (quality === 'export') return Math.min(recipe.layerHeight,thicknessSamplingStep(recipe));
+  if (recipe.strandPlacement==='fixed'||hasThicknessModulation(recipe))return Math.min(outlinePreviewStep(recipe),thicknessSamplingStep(recipe));
   if (recipe.scaleWithPerimeter || recipe.strandSpacing==='perimeter' || hasMovingCenters(recipe) || hasOutlineY(recipe) || hasSectionTransition(recipe) || hasOutlineTransition(recipe) || recipe.section==='ellipse' || hasRandomOffsets(recipe) || (recipe.outline && recipe.outline !== 'circle')) return outlinePreviewStep(recipe);
   const rate = orbitRateBound(recipe);
   const acceleration = pathDerivativeBounds(recipe).acceleration * Math.PI / 180 / recipe.height ** 2;
@@ -783,7 +823,7 @@ function outlinePreviewStep(recipe: RectangleRecipe): number {
 }
 
 function needsLocalPreview(recipe:RectangleRecipe) {
-  return recipe.scaleWithPerimeter||recipe.strandSpacing==='perimeter'||hasMovingCenters(recipe)||hasOutlineY(recipe)||hasSectionTransition(recipe)||hasOutlineTransition(recipe)
+  return recipe.strandPlacement==='fixed'||hasThicknessModulation(recipe)||recipe.scaleWithPerimeter||recipe.strandSpacing==='perimeter'||hasMovingCenters(recipe)||hasOutlineY(recipe)||hasSectionTransition(recipe)||hasOutlineTransition(recipe)
     ||recipe.section==='ellipse'||hasRandomOffsets(recipe)||recipe.outline!=='circle';
 }
 
@@ -791,10 +831,10 @@ function needsLocalPreview(recipe:RectangleRecipe) {
 export function generateRectangles(input: RectangleRecipe, options: { quality?: RectangleQuality; contours?: boolean; previewRefinement?: number; previewStep?: number } = {}) {
   const recipe = validateRectangles(input);
   const quality = options.quality ?? 'export';
-  const sampleStep = quality === 'export' ? recipe.layerHeight
-    : Math.max(recipe.layerHeight, (options.previewStep ?? rectangleSamplingStep(recipe, quality)) / 2 ** (options.previewRefinement ?? 0));
+  const sampleStep = Math.min(thicknessSamplingStep(recipe),quality === 'export' ? recipe.layerHeight
+    : Math.max(recipe.layerHeight, (options.previewStep ?? rectangleSamplingStep(recipe, quality)) / 2 ** (options.previewRefinement ?? 0)));
   const positions: number[] = [], indices: number[] = [];
-  const straight = !hasMovingCenters(recipe) && !hasSectionTransition(recipe) && !hasOutlineTransition(recipe) && recipe.twist === 0 && orbitRateBound(recipe) === 0 && recipe.topDiameter === recipe.diameter
+  const straight = !hasThicknessModulation(recipe) && !hasMovingCenters(recipe) && !hasSectionTransition(recipe) && !hasOutlineTransition(recipe) && recipe.twist === 0 && orbitRateBound(recipe) === 0 && recipe.topDiameter === recipe.diameter
     && !hasRandomOffsets(recipe)
     && (!hasOutlineY(recipe) || recipe.topSizeY === recipe.bottomSizeY)
     && (!recipe.taperSection || (recipe.topWidth === recipe.width && (recipe.section==='circle'||recipe.topDepth === recipe.depth)))
@@ -804,10 +844,10 @@ export function generateRectangles(input: RectangleRecipe, options: { quality?: 
   const bottom = recipe.bottomDisc ? recipe.discThickness / 2 : 0;
   let heights: number[] = [bottom];
   if(straight)heights.push(recipe.height);
-  else if(recipe.bulgePoints || pathKnots(recipe).length) {
+  else if(recipe.bulgePoints || pathKnots(recipe).length || thicknessKnots(recipe).length) {
     // Include every user knot even when several lie within one STL interval.
     // Subdivide each span evenly to avoid tiny leftover triangles at a knot.
-    const turns=pathKnots(recipe);
+    const turns=[...pathKnots(recipe),...thicknessKnots(recipe)];
     // Prefer exact path corners when a bulge is indistinguishably close at
     // Float32 mesh precision. Never produce two rings at the same stored Z.
     const knots=[...(recipe.bulgePoints??[]).map(p=>p.height/100*recipe.height)

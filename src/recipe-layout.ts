@@ -36,13 +36,13 @@ export function setupRecipeLayout(groups:{element:HTMLElement;expanded:boolean}[
   groups[0].element.parentElement!.classList.add('recipe-columns');
   groups.forEach(g=>{g.element.classList.add('recipe-column');g.expanded=true;});
   open.addEventListener('click',()=>{
-    if(dialog.open)return;
+    if(open.disabled||dialog.open)return;
     open.setAttribute('aria-expanded','true');
     dialog.showModal();
   });
   // Keep Space's normal editing, scrolling and activation inside controls/dialogs.
   document.addEventListener('keydown',(event)=>{
-    if(event.code!=='Space'||event.repeat||event.isComposing||event.defaultPrevented||
+    if(open.disabled||event.code!=='Space'||event.repeat||event.isComposing||event.defaultPrevented||
       event.altKey||event.ctrlKey||event.metaKey||event.shiftKey||document.querySelector('dialog[open],:popover-open'))return;
     const target=event.target;
     if(target instanceof HTMLElement && (target.isContentEditable||

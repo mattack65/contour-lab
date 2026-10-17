@@ -226,7 +226,7 @@
 .silhouette-preset select{width:175px;}
 #silhouette-structure{margin:4px 18px 18px;}
 .shared-recipe-files{margin:0 0 18px;}
-.shared-recipe-files .recipe-actions{display:flex;gap:8px;}
+.shared-recipe-files .recipe-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
 .shared-recipe-files button{flex:1;}
 
 /* Centre offsets belong to each level, beside its size and height. */

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173 --strictPort",
     "check": "tsc --noEmit",
-    "test": "node --experimental-strip-types --import ./tests/native-fetch.ts --test tests/*.test.ts",
+    "test": "node --experimental-strip-types --import ./tests/native-fetch.ts --test --test-concurrency=1 tests/*.test.ts",
     "build": "tsc --noEmit && vite build",
     "test:smoke": "node --experimental-strip-types tests/container-smoke.mjs"
   },

@@ -9,11 +9,11 @@ import type {RectanglePreviewMesh} from './rectangle-preview.ts';
 import { geometrySTL } from './export.ts';
 import {reduceSTL} from './reduced-export.ts';
 import {sliceMesh} from './tree.ts';
-import { rectangleDefaults, rectangleLimits, validateRectangles, orbitPathTilt, hasPhaseShift, hasSectionTransition, hasOutlineTransition, outlineSizeAt, editableBulgePoints, sectionSizeAt, strandPerimeterScaleAt } from './rectangles.ts';
+import { rectangleDefaults, rectangleLimits, validateRectangles, orbitPathTilt, hasPhaseShift, hasSectionTransition, hasOutlineTransition, outlineSizeAt, editableBulgePoints, baseSectionSizeAt, strandPerimeterScaleAt } from './rectangles.ts';
 import type { RectangleRecipe } from './rectangles.ts';
 import {overhangGeometry} from './overhang.ts';
-import {recipeFileBase,recipeSignature,MAX_RECIPE_FILE_BYTES} from './recipe-files.ts';
-import type {NamedRecipe} from './recipe-files.ts';
+import {recipeFileBase,recipeSignature,MAX_RECIPE_FILE_BYTES,RecipeFileSession,recipePickerOptions} from './recipe-files.ts';
+import type {NamedRecipe,RecipePickerHost,OpenRecipeHandle} from './recipe-files.ts';
 import {suggestSTLName,suggestSmoothWallName,validSTLName} from './export-names.ts';
 import {previewParameters,previewKey,previewBaseKey,parsePreviewDetail} from './preview-settings.ts';
 import type {PreviewDetail} from './preview-settings.ts';
@@ -38,9 +38,15 @@ const outlineDimensions = (r: RectangleRecipe,z: number) => {
 };
 const rectangles={...rectangleDefaults};
 const selection={model:'rectangles'};
+function showRecipeMigration(value:unknown){
+  const retired=(value as {thicknessModulation?:unknown}|null)?.thicknessModulation==='random';
+  const note=el('recipe-migration');
+  note.hidden=!retired;
+  note.textContent=retired?'This recipe used the retired Smooth random thickness option. Thickness modulation is now Off; all other settings were kept.':'';
+}
 try {
   const saved=JSON.parse(localStorage.getItem('contour-lab-study-v2')||'null');
-  if(saved?.rectangles)Object.assign(rectangles,validateRectangles(saved.rectangles));
+  if(saved?.rectangles){Object.assign(rectangles,validateRectangles(saved.rectangles));showRecipeMigration(saved.rectangles);}
 }catch {status('Saved recipe could not be restored; using the defaults.');}
 const cavityOptions={enabled:false,inset:3,floor:2,repair:false,repairInset:0,fillPockets:false};
 function restoreCavityOptions() {
@@ -94,8 +100,8 @@ function updateBuildButton(message: string) {
     button.disabled=building||exporting;
     button.textContent=building?'Building…':id==='build-recipe'?'Build · Ctrl+Enter':'Build';
   }
-  document.querySelectorAll<HTMLButtonElement>('[data-open-silhouette]').forEach(b=>b.disabled=building||exporting);
-  el<HTMLButtonElement>('clear').disabled=building||exporting;
+  document.querySelectorAll<HTMLButtonElement>('[data-open-silhouette], #expand-recipe').forEach(b=>b.disabled=building||exporting);
+  el<HTMLButtonElement>('clear').disabled=building||exporting||recipeIOBusy;
   const cancel=el<HTMLButtonElement>('cancel-build');
   cancel.hidden=!building;cancel.disabled=!!buildAbort?.signal.aborted;
   cancel.textContent=cancel.disabled?'Cancelling…':'Cancel';
@@ -104,6 +110,9 @@ function updateBuildButton(message: string) {
 const buildProgress=new BuildProgressView(el('build-progress'));
 function currentRecipe() { return rectangles; }
 function recipeName() { return suggestSTLName(rectangles).replace(/\.stl$/,''); }
+const recipeFiles=new RecipeFileSession();
+const recipePickers=window as Window & RecipePickerHost;
+let recipeIOBusy=false;
 let namedRecipe:NamedRecipe|undefined;
 try {
   const saved=JSON.parse(localStorage.getItem('contour-lab-named-recipe')||'null');
@@ -506,7 +515,7 @@ async function rebuild() {
 }
 
 function strandDimensions(r:RectangleRecipe,z=0) {
-  const size=sectionSizeAt(r,z);
+  const size=baseSectionSizeAt(r,z);
   return (z===r.height?(r.topSection??r.section):r.section)==='circle'?'Ø '+displayNumber(size.width)+' mm'
     :displayNumber(size.width)+' × '+displayNumber(size.depth)+' mm';
 }
@@ -551,7 +560,7 @@ const topShapeOptions={
 const motionBindings: {binding:{hidden:boolean};modes:RectangleRecipe['motion'][]}[]=[];
 const sectionDimensions: {key:string;binding:{hidden:boolean;label:string|null|undefined;element:HTMLElement}}[]=[];
 const sectionTaperBindings: {hidden:boolean}[]=[];
-function dimension(folder:typeof rectangleShape,key:'count'|'width'|'depth'|'topWidth'|'topDepth'|'orbitTwist'|'twist'|'waveAmplitude'|'waveCycles'|'phaseTurns'|'turnPower'|'waveEndCycles'|'wanderAmplitude'|'wanderBends'|'wanderSeed',label:string,step:number) {
+function dimension(folder:typeof rectangleShape,key:'count'|'width'|'depth'|'topWidth'|'topDepth'|'orbitTwist'|'twist'|'waveAmplitude'|'waveCycles'|'phaseTurns'|'turnPower'|'waveEndCycles'|'wanderAmplitude'|'wanderBends'|'wanderSeed'|'thicknessAmplitude'|'thicknessCycles',label:string,step:number) {
   const binding=folder.addBinding(rectangles,key,{label,min:rectangleLimits[key][0],max:rectangleLimits[key][1],step});
   binding.element.querySelector('input')?.setAttribute('aria-label',label);
   if(['width','depth','topWidth','topDepth'].includes(key))sectionDimensions.push({key,binding});
@@ -589,6 +598,19 @@ const strandSidesBinding=rectangleShape.addBinding(rectangles,'sectionSides',{
 });
 strandSidesBinding.element.querySelector('input')?.setAttribute('aria-label','Round sides · both ends');
 strandSidesBinding.element.title='More sides give smoother circular and elliptical strands. Applies to preview and all STL exports; increases build time and mesh size.';
+rectangleShape.addBinding(rectangles,'strandPlacement',{label:'Strand centres',options:{'Fit inside outline':'inside','Keep centre paths fixed':'fixed'}})
+  .element.querySelector('select')?.setAttribute('aria-label','Strand centres');
+parameterHint(rectangleShape,'Fixed centre paths use the bottom strand profile to set the inset at each height. Thickness modulation, perimeter sizing, taper and shape changes then grow around those centres; the surface can extend beyond the outline. Fit inside outline preserves the original placement.');
+const thicknessFolder=rectangleShape.addFolder({title:'Thickness modulation',expanded:true});
+thicknessFolder.addBinding(rectangles,'thicknessModulation',{label:'Thickness function',options:{Off:'none','Sine wave':'sine','Sine squared · growth only':'sineSquared','Triangle wave':'triangle'}})
+  .element.querySelector('select')?.setAttribute('aria-label','Thickness function');
+const thicknessBindings=[
+  dimension(thicknessFolder,'thicknessAmplitude','Thickness amplitude · ±%',1),
+  dimension(thicknessFolder,'thicknessCycles','Thickness waves over height',.25),
+  thicknessFolder.addBinding(rectangles,'alternateThickness',{label:'Alternate thickness'}),
+];
+thicknessBindings[2].element.querySelector('input')?.setAttribute('aria-label','Alternate thickness');
+const thicknessHelp=parameterHint(thicknessFolder,'Multiplies both strand dimensions after taper, shape transition and perimeter sizing. ±30% gives 70–130% of the local size. Starts at the base size; alternating strands grow and shrink in opposite phases (even count required). Smooth interior stays smooth.');
 const pathFolder=rectangleShape.addFolder({title:'Travel around the outline',expanded:true});
 pathFolder.addBinding(rectangles,'motion',{label:'Path motion',options:{'Steady turn':'helix','Sine wave':'sine','Accelerating turn':'accelerating','Changing wavelength':'chirp','Random wandering':'wander','Sharp zigzag':'zigzag'}})
   .element.querySelector('select')?.setAttribute('aria-label','Path motion');
@@ -694,9 +716,21 @@ for(const [key,label] of [['inset','Cavity radial inset · mm'],['floor','Cavity
 const cavityHelp=document.createElement('p');cavityHelp.className='parameter-hint';
 enableCavity.element.parentElement!.appendChild(cavityHelp);
 function showFolders() {
+  const thicknessMode=rectangles.thicknessModulation??'none',thicknessOn=thicknessMode!=='none';
+  thicknessBindings.forEach(b=>b.hidden=!thicknessOn);
+  const thicknessLabel=thicknessMode==='sineSquared'?'Thickness amplitude · +%':'Thickness amplitude · ±%';
+  thicknessBindings[0].label=thicknessLabel;
+  thicknessBindings[0].element.querySelector('input')?.setAttribute('aria-label',thicknessLabel);
+  thicknessHelp.hidden=!thicknessOn;
+  thicknessHelp.textContent=(thicknessMode==='sineSquared'
+    ?'Growth only: 30% gives 100–130% of the local size. One rounded bulge per wave. Alternating strands use complementary bulges; every second strand starts enlarged. '
+    :thicknessMode==='triangle'
+    ?'Linear growth and shrinkage with sharp peaks and valleys. ±30% gives 70–130% of the local size; one peak and valley per wave. Alternating strands use the inverse. '
+    :'Smooth sine growth and shrinkage. ±30% gives 70–130% of the local size. Starts at base size; alternating strands are 180° apart. ')
+    +'Multiplies both dimensions after base sizing and shape transitions. Alternating requires an even strand count. Smooth interior stays smooth.';
   strandSidesBinding.hidden=![rectangles.section,rectangles.topSection].some(s=>s==='circle'||s==='ellipse');
   perimeterSizingHelp.hidden=!rectangles.scaleWithPerimeter;
-  if(rectangles.scaleWithPerimeter){const size=sectionSizeAt(rectangles,rectangles.height),circle=(rectangles.topSection??rectangles.section)==='circle';
+  if(rectangles.scaleWithPerimeter){const size=baseSectionSizeAt(rectangles,rectangles.height),circle=(rectangles.topSection??rectangles.section)==='circle';
     perimeterSizingHelp.textContent='Sizes follow the nominal perimeter, ignoring random offsets. Calculated top: '+(circle?'diameter '+displayNumber(size.width):displayNumber(size.width)+' × '+displayNumber(size.depth))+' mm. Replaces manual top sizes; exact physical overlap can vary.';
   }
   taperToggle.hidden=!!rectangles.scaleWithPerimeter||hasSectionTransition(rectangles);
@@ -710,9 +744,9 @@ function showFolders() {
     cavityBindings[index].element.querySelector('input')?.setAttribute('aria-label',label);
   }
   const topScale=strandPerimeterScaleAt(rectangles,rectangles.height);
-  cavityHelp.textContent=(scaledCavity?'Both inset values apply at the bottom and scale with the strands at every height. Calculated top: cavity '+displayNumber(cavityOptions.inset*topScale)+' mm'+(cavityOptions.repair?', outer fill '+displayNumber(cavityOptions.repairInset*topScale)+' mm':'')+'. Floor and plate thicknesses stay fixed. ':'')
+  cavityHelp.textContent=(scaledCavity?'Both inset values apply at the bottom and scale with the outline perimeter at every height. Calculated top: cavity '+displayNumber(cavityOptions.inset*topScale)+' mm'+(cavityOptions.repair?', outer fill '+displayNumber(cavityOptions.repairInset*topScale)+' mm':'')+'. Floor and plate thicknesses stay fixed. ':'')
     +'Bottom 0 = no cavity floor; preserves any bottom plate and hole. Insets are radial, not perpendicular wall thickness. Fill enclosed wall pockets removes sealed voids only; openings to the outside stay open.'
-    +(cavityOptions.repair?' '+(scaledCavity?'Bottom radial allowance: ':'Radial allowance: ')+displayNumber(cavityOptions.inset-cavityOptions.repairInset)+' mm.'+(scaledCavity?' This allowance scales with the strands.':'')+' Outer fill can change deep valleys.':'');
+    +(cavityOptions.repair?' '+(scaledCavity?'Bottom radial allowance: ':'Radial allowance: ')+displayNumber(cavityOptions.inset-cavityOptions.repairInset)+' mm.'+(scaledCavity?' This allowance scales with the outline perimeter.':'')+' Outer fill can change deep valleys.':'');
   syncLevelOffsets();
   for(const binding of randomBindings){
     binding.amount.hidden=false;
@@ -786,31 +820,47 @@ function download(data: Blob, name: string) {
   anchor.href = url; anchor.download = name; anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
-el('save').addEventListener('click', async () => {
-  const model=selection.model,current={...currentRecipe()};
+function setRecipeIO(busy:boolean){
+  recipeIOBusy=busy;
+  for(const id of ['save','save-as','load'])el<HTMLButtonElement>(id).disabled=busy;
+  el<HTMLButtonElement>('clear').disabled=busy||building||exporting;
+}
+async function saveRecipe(saveAs=false){
+  if(recipeIOBusy)return;
+  const model=selection.model,current=structuredClone(currentRecipe());
   const suggestedName=`${namedRecipe?.base||recipeName()}.json`;
   const data=new Blob([JSON.stringify({format:'contour-lab',version:3,model,units:'mm',recipe:current},null,2)],{type:'application/json'});
-  const button=el<HTMLButtonElement>('save');button.disabled=true;
+  setRecipeIO(true);
   try {
-    const filename=await askFilename({
-      title:'Save recipe',suggestedName,action:'Save',
-      hint:'This name will also be suggested for STL exports. Files go to your browser’s download location.',
-      validate:value=>{
-        // Share the STL validator's cross-platform filename rules.
-        const stem=value.trim().replace(/\.json$/i,'');
-        return validSTLName(stem+'.stl').replace(/\.stl$/i,'.json');
-      }
-    });
-    if(filename===null){status('Recipe save cancelled.');return;}
-    download(data,filename);
-    rememberRecipeName(filename,model,current);
-    status(`Recipe saved as ${filename}. STL exports will use ${recipeFileBase(filename)}.stl.`);
+    if(recipePickers.showSaveFilePicker){
+      // Call directly from the click: native pickers require user activation.
+      const filename=await recipeFiles.save(recipePickers,data,suggestedName,saveAs);
+      rememberRecipeName(filename,model,current);
+      status(`Recipe saved as ${filename}. Save will update this same file; use Save as… for a separate copy.`);
+    }else{
+      const filename=await askFilename({
+        title:'Download recipe',suggestedName,action:'Download',
+        hint:'This browser cannot overwrite local files. Downloads may receive a numbered suffix. Open Contour Lab in desktop Chrome or Edge for Save and Save as. This name also carries over to STL exports.',
+        validate:value=>{
+          const stem=value.trim().replace(/\.json$/i,'');
+          return validSTLName(stem+'.stl').replace(/\.stl$/i,'.json');
+        }
+      });
+      if(filename===null){status('Recipe save cancelled.');return;}
+      download(data,filename);
+      rememberRecipeName(filename,model,current);
+      status(`Recipe download requested as ${filename}. This browser may add a numbered suffix; the original file was not overwritten.`);
+    }
   } catch(error) {
-    status((error as Error).name==='AbortError'?'Recipe save cancelled.':`Could not save recipe: ${(error as Error).message}`);
-  } finally {button.disabled=false;}
-});
+    status((error as Error).name==='AbortError'?'Recipe save cancelled.':`Could not save recipe: ${(error as Error).message}. Use Save as… to choose a writable file.`);
+  } finally {setRecipeIO(false);}
+}
+el('save').addEventListener('click',()=>void saveRecipe());
+el('save-as').addEventListener('click',()=>void saveRecipe(true));
+el('save').title=recipePickers.showSaveFilePicker?'Update the current recipe file; choose a location on first save':'Download recipe (this browser cannot overwrite files)';
 el('clear').addEventListener('click',()=>{
-  if(building||exporting)return;
+  if(building||exporting||recipeIOBusy)return;
+  recipeFiles.use(undefined);showRecipeMigration(null);
   // Remove optional values as well as resetting defaults; bindings keep this object.
   for(const key of Object.keys(rectangles))delete (rectangles as unknown as Record<string,unknown>)[key];
   Object.assign(rectangles,structuredClone(rectangleDefaults));
@@ -821,23 +871,36 @@ el('clear').addEventListener('click',()=>{
   pane.refresh();showFolders();settingsChanged();
   void rebuild();
 });
-el('load').addEventListener('click', () => el<HTMLInputElement>('recipe-file').click());
-el<HTMLInputElement>('recipe-file').addEventListener('change', async event => {
-  const input = event.target as HTMLInputElement;
-  try {
-    const file = input.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_RECIPE_FILE_BYTES) throw new Error('Recipe file is too large (maximum 1 MB).');
-    const json = JSON.parse(await file.text());
-    if (json.format !== 'contour-lab' || ![1,2,3].includes(json.version) || json.units !== 'mm') throw new Error('Unsupported recipe format.');
-    if(json.version!==3||json.model!=='rectangles')throw new Error('This app loads strand recipes only. Tree and tower models are no longer supported.');
-    Object.assign(rectangles,validateRectangles(json.recipe));restoreCavityOptions();
-    el<HTMLInputElement>('stl-step').value=displayNumber(rectangles.layerHeight);
-    pane.refresh();showFolders();settingsChanged();
-    rememberRecipeName(file.name,selection.model,currentRecipe());
-    status('Recipe loaded — click Build to update the preview.');
-  } catch (error) { status(`Could not load recipe: ${(error as Error).message}`); }
-  finally { input.value = ''; }
+async function loadRecipeFile(file:File,handle?:OpenRecipeHandle){
+  if (file.size > MAX_RECIPE_FILE_BYTES) throw new Error('Recipe file is too large (maximum 1 MB).');
+  const json = JSON.parse(await file.text());
+  if (json.format !== 'contour-lab' || ![1,2,3].includes(json.version) || json.units !== 'mm') throw new Error('Unsupported recipe format.');
+  if(json.version!==3||json.model!=='rectangles')throw new Error('This app loads strand recipes only. Tree and tower models are no longer supported.');
+  const validated=validateRectangles(json.recipe);
+  Object.assign(rectangles,validated);restoreCavityOptions();
+  el<HTMLInputElement>('stl-step').value=displayNumber(rectangles.layerHeight);
+  pane.refresh();showFolders();settingsChanged();
+  recipeFiles.use(handle);showRecipeMigration(json.recipe);
+  rememberRecipeName(file.name,selection.model,currentRecipe());
+  status('Recipe loaded — click Build to update the preview.');
+}
+el('load').addEventListener('click',async()=>{
+  if(recipeIOBusy)return;
+  if(!recipePickers.showOpenFilePicker){el<HTMLInputElement>('recipe-file').click();return;}
+  setRecipeIO(true);
+  try{
+    const [handle]=await recipePickers.showOpenFilePicker({...recipePickerOptions,multiple:false});
+    if(handle)await loadRecipeFile(await handle.getFile(),handle);
+  }catch(error){status((error as Error).name==='AbortError'?'Recipe load cancelled.':`Could not load recipe: ${(error as Error).message}`);}
+  finally{setRecipeIO(false);}
+});
+el<HTMLInputElement>('recipe-file').addEventListener('change',async event=>{
+  const input=event.target as HTMLInputElement;
+  if(recipeIOBusy){input.value='';return;}
+  setRecipeIO(true);
+  try{const file=input.files?.[0];if(file)await loadRecipeFile(file);}
+  catch(error){status(`Could not load recipe: ${(error as Error).message}`);}
+  finally{input.value='';setRecipeIO(false);}
 });
 async function downloadSTL(mode:'full'|'lightweight'|'reduced'|'smooth-wall'='full') {
   const lightweight=mode==='lightweight',reduced=mode==='reduced',smoothWall=mode==='smooth-wall';

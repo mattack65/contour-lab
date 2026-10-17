@@ -20,6 +20,8 @@ export function suggestSTLName(r:RectangleRecipe,lightweight=false,solid=false,s
   bulges.length?'bulge'+bulges.join('x'):'no-bulges',motion,'phase'+n(r.phaseTurns),'twist'+n(r.twist)+(r.randomTwist?'random':'')+(r.alternateTwist?'alt':''),
   ...(r.strandSpacing==='perimeter'?['equal-spacing']:[]),
   ...(r.scaleWithPerimeter?['perimeter-sized']:[]),
+  ...(r.strandPlacement==='fixed'?['fixed-centres']:[]),
+  ...(r.thicknessModulation&&r.thicknessModulation!=='none'&&r.thicknessAmplitude?['thickness-'+r.thicknessModulation+'-'+n(r.thicknessAmplitude)+'pct-'+(n(r.thicknessCycles??1)+'waves')+(r.alternateThickness?'-alt':'')]:[]),
   ...(r.alternateOrbit?['alt']:[]),
   ...(r.bottomDisc?['plate'+n(r.discThickness)+'-hole'+n(r.discHole)]:[]),
   ...(c?['cavity'+n(c.inset)+'-floor'+n(c.floor),...(c.repairInset!==undefined?['fill'+n(c.repairInset)]:[]),...(c.fillPockets?['filled-pockets']:[])]:[]),

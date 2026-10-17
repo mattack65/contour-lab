@@ -15,12 +15,45 @@ export function matchingRecipeBase(named:NamedRecipe|undefined,model:string,reci
 
 export interface RecipeFileHandle {
   name:string;
-  createWritable():Promise<{write(data:Blob):Promise<void>;close():Promise<void>}>;
+  createWritable():Promise<{write(data:Blob):Promise<void>;close():Promise<void>;abort?():Promise<void>}>;
 }
 /** Remember a native filename only after the complete write succeeds. */
 export async function writeRecipeFile(handle:RecipeFileHandle,data:Blob):Promise<string> {
   const stream=await handle.createWritable();
-  await stream.write(data);
-  await stream.close();
+  try {
+    await stream.write(data);
+    await stream.close();
+  } catch(error) {
+    try {await stream.abort?.();}catch { /* Preserve the original write error. */ }
+    throw error;
+  }
   return handle.name;
+}
+
+/** A handle refers to the selected file, not just its name or Downloads folder. */
+export interface OpenRecipeHandle extends RecipeFileHandle {getFile():Promise<File>}
+export interface RecipePickerHost {
+  showSaveFilePicker?:(options:object)=>Promise<RecipeFileHandle>;
+  showOpenFilePicker?:(options:object)=>Promise<OpenRecipeHandle[]>;
+}
+export const recipePickerOptions={
+  id:'contour-lab-recipes',
+  types:[{description:'Contour Lab recipe',accept:{'application/json':['.json']}}],
+  excludeAcceptAllOption:true,
+};
+/** Keep a file association only after a successful load or completed save. */
+export class RecipeFileSession {
+  private handle:RecipeFileHandle|undefined;
+  get filename(){return this.handle?.name;}
+  use(handle:RecipeFileHandle|undefined){this.handle=handle;}
+  async save(host:RecipePickerHost,data:Blob,suggestedName:string,saveAs=false):Promise<string>{
+    let handle=saveAs?undefined:this.handle;
+    if(!handle){
+      if(!host.showSaveFilePicker)throw new Error('Direct file saving is unavailable in this browser.');
+      handle=await host.showSaveFilePicker({...recipePickerOptions,suggestedName});
+    }
+    const filename=await writeRecipeFile(handle,data);
+    this.handle=handle;
+    return filename;
+  }
 }

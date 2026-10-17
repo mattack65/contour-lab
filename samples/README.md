@@ -17,6 +17,19 @@ Or click **View in 3D** to rotate and zoom a sample directly on GitHub. These sm
 
 These are screenshots of the actual models at Standard preview detail. Views are framed independently; the images are not to a common scale.
 
+## Thickness modulation recipes
+
+These additional recipes use the new thickness controls. Load them in the current version of Contour Lab and press **Build**.
+
+| Recipe | Thickness pattern |
+| --- | --- |
+| [Vase bubbles](vase_bubbles.json) | Alternating sine |
+| [Cone sin](cone_sin.json) | Alternating triangle wave |
+| [Cone](cone.json) | Alternating triangle wave |
+| [Woven 2](woven_2.json) | Complementary sine squared |
+| [Woven](woven.json) | Alternating sine |
+| [Raspberry](raspberry.json) | Alternating sine |
+
 ## Real prints
 
 The two **Standard lights**, printed and illuminated. “Standard” refers to the approximately 60 mm LED puck fitting used for these lamps.
