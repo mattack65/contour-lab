@@ -34,9 +34,9 @@ The **Standard lights**, printed and illuminated. “Standard” refers to the a
 | --- | --- |
 | <a href="images/print-illuminated-lamp.jpg"><img src="images/print-illuminated-lamp.jpg" width="320" alt="Standard light 1, printed and illuminated"></a> | <a href="images/print-standard-light-2.jpg"><img src="images/print-standard-light-2.jpg" width="320" alt="Standard light 2, printed and illuminated"></a> |
 | [standard_light_1.json](standard_light_1.json) · [View in 3D](models/standard_light_1.stl) | [standard_light_2.json](standard_light_2.json) · [View in 3D](models/standard_light_2.stl) |
-| **Standard light 3** | |
-| <a href="images/print-standard-light-3.jpg"><img src="images/print-standard-light-3.jpg" width="320" alt="Standard light 3, printed and illuminated"></a> | |
-| [standard_light_3_v4.json](standard_light_3_v4.json) · [View in 3D](models/standard_light_3_v4.stl) | |
+| **Standard light 3** | **Standard light 4** |
+| <a href="images/print-standard-light-3.jpg"><img src="images/print-standard-light-3.jpg" width="320" alt="Standard light 3, printed and illuminated"></a> | <a href="images/print-standard-light-4.jpg"><img src="images/print-standard-light-4.jpg" width="320" alt="Standard light 4, printed and illuminated"></a> |
+| [standard_light_3_v4.json](standard_light_3_v4.json) · [View in 3D](models/standard_light_3_v4.stl) | [standard_light_4.json](standard_light_4.json) · [View in 3D](models/standard_light_4.stl) |
 
 
 More physical prints made with Contour Lab. These illustrate other designs and are not necessarily the exact recipes above.
