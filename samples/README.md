@@ -2,16 +2,18 @@
 
 Download a recipe, open it with **Load** in Contour Lab, then press **Build**.
 
+Or click **View in 3D** to rotate and zoom a sample directly on GitHub. These small STL files are viewing previews, simplified where needed to fit the viewer. For printing, load the recipe and export at your preferred detail.
+
 | Standard light 1 | Standard light 2 |
 | --- | --- |
 | [![Standard light 1](images/standard_light_1.jpg)](standard_light_1.json) | [![Standard light 2](images/standard_light_2.jpg)](standard_light_2.json) |
-| [standard_light_1.json](standard_light_1.json) | [standard_light_2.json](standard_light_2.json) |
+| [standard_light_1.json](standard_light_1.json) · [View in 3D](models/standard_light_1.stl) | [standard_light_2.json](standard_light_2.json) · [View in 3D](models/standard_light_2.stl) |
 | **Slim asymmetric** | **Funky** |
 | [![Slim asymmetric](images/slim_asymmetric_1.jpg)](slim_asymmetric_1.json) | [![Funky](images/funky_2.jpg)](funky_2.json) |
-| [slim_asymmetric_1.json](slim_asymmetric_1.json) | [funky_2.json](funky_2.json) |
+| [slim_asymmetric_1.json](slim_asymmetric_1.json) · [View in 3D](models/slim_asymmetric_1.stl) | [funky_2.json](funky_2.json) · [View in 3D](models/funky_2.stl) |
 | **Hairy** | |
 | [![Hairy](images/hairy.jpg)](hairy.json) | |
-| [hairy.json](hairy.json) | |
+| [hairy.json](hairy.json) · [View in 3D](models/hairy.stl) | |
 
 These are screenshots of the actual models at Standard preview detail. Views are framed independently; the images are not to a common scale.
 
@@ -22,7 +24,7 @@ The two **Standard lights**, printed and illuminated. “Standard” refers to t
 | Standard light 1 | Standard light 2 |
 | --- | --- |
 | <a href="images/print-illuminated-lamp.jpg"><img src="images/print-illuminated-lamp.jpg" width="320" alt="Standard light 1, printed and illuminated"></a> | <a href="images/print-standard-light-2.jpg"><img src="images/print-standard-light-2.jpg" width="320" alt="Standard light 2, printed and illuminated"></a> |
-| [standard_light_1.json](standard_light_1.json) | [standard_light_2.json](standard_light_2.json) |
+| [standard_light_1.json](standard_light_1.json) · [View in 3D](models/standard_light_1.stl) | [standard_light_2.json](standard_light_2.json) · [View in 3D](models/standard_light_2.stl) |
 
 More physical prints made with Contour Lab. These illustrate other designs and are not necessarily the exact recipes above.
 
