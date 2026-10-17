@@ -11,24 +11,20 @@ Or click **View in 3D** to rotate and zoom a sample directly on GitHub. These sm
 | **Slim asymmetric** | **Funky** |
 | [![Slim asymmetric](images/slim_asymmetric_1.jpg)](slim_asymmetric_1.json) | [![Funky](images/funky_2.jpg)](funky_2.json) |
 | [slim_asymmetric_1.json](slim_asymmetric_1.json) · [View in 3D](models/slim_asymmetric_1.stl) | [funky_2.json](funky_2.json) · [View in 3D](models/funky_2.stl) |
-| **Hairy** | |
-| [![Hairy](images/hairy.jpg)](hairy.json) | |
-| [hairy.json](hairy.json) · [View in 3D](models/hairy.stl) | |
+| **Hairy** | **Vase bubbles** |
+| [![Hairy](images/hairy.jpg)](hairy.json) | [![Vase bubbles](images/vase_bubbles.jpg)](vase_bubbles.json) |
+| [hairy.json](hairy.json) · [View in 3D](models/hairy.stl) | [vase_bubbles.json](vase_bubbles.json) · [View in 3D](models/vase_bubbles.stl) |
+| **Cone sin** | **Cone** |
+| [![Cone sin](images/cone_sin.jpg)](cone_sin.json) | [![Cone](images/cone.jpg)](cone.json) |
+| [cone_sin.json](cone_sin.json) · [View in 3D](models/cone_sin.stl) | [cone.json](cone.json) · [View in 3D](models/cone.stl) |
+| **Woven 2** | **Woven** |
+| [![Woven 2](images/woven_2.jpg)](woven_2.json) | [![Woven](images/woven.jpg)](woven.json) |
+| [woven_2.json](woven_2.json) · [View in 3D](models/woven_2.stl) | [woven.json](woven.json) · [View in 3D](models/woven.stl) |
+| **Raspberry** |  |
+| [![Raspberry](images/raspberry.jpg)](raspberry.json) |  |
+| [raspberry.json](raspberry.json) · [View in 3D](models/raspberry.stl) |  |
 
-These are screenshots of the actual models at Standard preview detail. Views are framed independently; the images are not to a common scale.
-
-## Thickness modulation recipes
-
-These additional recipes use the new thickness controls. Load them in the current version of Contour Lab and press **Build**.
-
-| Recipe | Thickness pattern |
-| --- | --- |
-| [Vase bubbles](vase_bubbles.json) | Alternating sine |
-| [Cone sin](cone_sin.json) | Alternating triangle wave |
-| [Cone](cone.json) | Alternating triangle wave |
-| [Woven 2](woven_2.json) | Complementary sine squared |
-| [Woven](woven.json) | Alternating sine |
-| [Raspberry](raspberry.json) | Alternating sine |
+Views are framed independently; the images are not to a common scale.
 
 ## Real prints
 
