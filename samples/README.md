@@ -20,9 +20,9 @@ Or click **View in 3D** to rotate and zoom a sample directly on GitHub. These sm
 | **Cone** | **Woven 2** |
 | [![Cone](images/cone.jpg)](cone.json) | [![Woven 2](images/woven_2.jpg)](woven_2.json) |
 | [cone.json](cone.json) · [View in 3D](models/cone.stl) | [woven_2.json](woven_2.json) · [View in 3D](models/woven_2.stl) |
-| **Raspberry** |  |
-| [![Raspberry](images/raspberry.jpg)](raspberry.json) |  |
-| [raspberry.json](raspberry.json) · [View in 3D](models/raspberry.stl) |  |
+| **Raspberry** | **100 mm LED 1** |
+| [![Raspberry](images/raspberry.jpg)](raspberry.json) | [![100 mm LED 1](images/100_mm_led_1.jpg)](100_mm_led_1.json) |
+| [raspberry.json](raspberry.json) · [View in 3D](models/raspberry.stl) | [100_mm_led_1.json](100_mm_led_1.json) · [View in 3D](models/100_mm_led_1.stl) |
 
 Views are framed independently; the images are not to a common scale.
 
@@ -38,6 +38,11 @@ The **Standard lights**, printed and illuminated. “Standard” refers to the a
 | <a href="images/print-standard-light-3.jpg"><img src="images/print-standard-light-3.jpg" width="320" alt="Standard light 3, printed and illuminated"></a> | <a href="images/print-standard-light-4.jpg"><img src="images/print-standard-light-4.jpg" width="320" alt="Standard light 4, printed and illuminated"></a> |
 | [standard_light_3_v4.json](standard_light_3_v4.json) · [View in 3D](models/standard_light_3_v4.stl) | [standard_light_4.json](standard_light_4.json) · [View in 3D](models/standard_light_4.stl) |
 
+
+| 100 mm LED 1 |
+| --- |
+| <a href="images/print-100-mm-led-1.jpg"><img src="images/print-100-mm-led-1.jpg" width="320" alt="100 mm LED 1, printed and illuminated"></a> |
+| [100_mm_led_1.json](100_mm_led_1.json) · [View in 3D](models/100_mm_led_1.stl) |
 
 More physical prints made with Contour Lab. These illustrate other designs and are not necessarily the exact recipes above.
 
