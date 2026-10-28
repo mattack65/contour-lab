@@ -1,3 +1,5 @@
+import {printerEnvelope,savePrinterEnvelope,printerShapeError,printerFootprintError} from './printer-settings.ts';
+import {LampPreview} from './lamp-preview.ts';
 import {editStrandPolygon} from './polygon-editor.ts';
 import {setupSilhouetteEditor} from './silhouette-editor.ts';
 import {BuildProgressView} from './build-progress.ts';
@@ -85,13 +87,18 @@ function cavityBottomText(r:RectangleRecipe) {
     :displayNumber(c.floor)+' mm closed bottom; plate hole filled';
 }
 function updateExportButtons() {
+  el<HTMLFieldSetElement>('printer-envelope').disabled=building||exporting;
+  const printerError=displayedRecipe?printerFootprintError(builtGeometry.boundingBox!):undefined;
+  el<HTMLInputElement>('vase-preview').disabled=building||exporting||!displayedRecipe||!!lamp?.active;
+  lamp?.setBusy(building||exporting);
+  el<HTMLInputElement>('show-layer-inspector').disabled=!!lamp?.active;
   const cavity=selection.model==='rectangles'&&rectangles.smoothCavity;
   solidExport.disabled=exporting||!!cavity;
   if(cavity)solidExport.checked=false;
   el<HTMLInputElement>('stl-step').disabled=exporting;
   previewDetailPicker.disabled=building||exporting;
   for(const id of ['export','export-reduced','export-lightweight','export-smooth-wall']) {
-    el<HTMLButtonElement>(id).disabled=building||exporting||!previewIsCurrent()||(id!=='export-lightweight'&&!el<HTMLInputElement>('stl-step').checkValidity())
+    el<HTMLButtonElement>(id).disabled=building||exporting||!previewIsCurrent()||!!printerError||(id!=='export-lightweight'&&!el<HTMLInputElement>('stl-step').checkValidity())
       ||(id==='export-smooth-wall'&&(!cavity||cavity.repairInset===undefined));
   }
 }
@@ -172,6 +179,7 @@ controls.maxDistance = 1400;
 // Allow orbiting all the way underneath the sculpture.
 controls.maxPolarAngle = Math.PI;
 controls.autoRotateSpeed = 1;
+let lamp: LampPreview|undefined;
 let renderPending=false;
 let lastFrameTime=0;
 function requestRender(refreshShadow=false) {
@@ -187,8 +195,15 @@ function requestRender(refreshShadow=false) {
     renderPending=true;
     controls.update(delta);
     // Keep the ground guides from covering the underside.
-    floor.visible=camera.position.z>=floor.position.z;
-    grid.visible=camera.position.z>=grid.position.z;
+    const illuminated=lamp?.active??false;
+    const room=lamp?.room??.12;
+    hemisphere.intensity=illuminated?room:2.3;
+    key.intensity=illuminated?room*1.5:3.2;fill.intensity=illuminated?room*.7:2;
+    (scene.background as THREE.Color).set(illuminated?'#161514':'#f3f1eb');
+    sculpture.visible=!illuminated&&viewMode!=='contours';
+    contours.visible=!illuminated&&viewMode!=='solid';
+    floor.visible=!illuminated&&camera.position.z>=floor.position.z;
+    grid.visible=!illuminated&&camera.position.z>=grid.position.z;
     renderer.render(scene,camera);
     renderPending=false;
     if(controls.autoRotate)requestRender();
@@ -199,7 +214,7 @@ controls.addEventListener('change',()=>requestRender());
 document.addEventListener('visibilitychange',()=>{lastFrameTime=0;requestRender();});
 
 
-scene.add(new THREE.HemisphereLight('#fff9ed', '#888d85', 2.3));
+const hemisphere=new THREE.HemisphereLight('#fff9ed', '#888d85', 2.3);scene.add(hemisphere);
 const key = new THREE.DirectionalLight('#fff4df', 3.2);
 key.position.set(-70, -100, 160);
 key.castShadow = true;
@@ -250,6 +265,13 @@ finishPicker.addEventListener('change',event=>{
 });
 const highlightMaterial = new THREE.LineBasicMaterial({ color: '#e3ae26', depthTest: false });
 const sculpture = new THREE.Mesh(new THREE.BufferGeometry(), material);
+// Keep build geometry independent of temporary display conversions. In
+// particular lightweight export must never serialize the vase preview shell.
+let builtGeometry=sculpture.geometry;
+let vaseGeometry:THREE.BufferGeometry|undefined;
+let vaseWorker:Worker|undefined;
+const vaseToggle=el<HTMLInputElement>('vase-preview');
+const vaseNote=el('vase-preview-note');
 sculpture.castShadow = true;
 sculpture.receiveShadow = false;
 const contours = new THREE.LineSegments(new THREE.BufferGeometry(), lineMaterial);
@@ -271,6 +293,14 @@ function updateOverhangs() {
   requestRender();
   const enabled=el<HTMLInputElement>('show-overhangs').checked;
   const threshold=el<HTMLInputElement>('overhang-threshold').valueAsNumber;
+  const layered=sculpture.geometry===vaseGeometry;
+  el<HTMLInputElement>('show-overhangs').disabled=layered||!!lamp?.active;
+  if(lamp?.active){overhangOverlay.visible=false;el('overhang-note').hidden=true;return;}
+  if(layered) {
+    overhangOverlay.visible=false;el('overhang-note').hidden=!enabled;
+    el('overhang-note').textContent='Turn off Vase mode preview to use the surface overhang guide. The simulated layers have horizontal ledges.';
+    return;
+  }
   overhangOverlay.visible=enabled;
   el('overhang-note').hidden=!enabled;
   if(!enabled)return;
@@ -299,7 +329,7 @@ function stopContourWorker() {
 
 /** Slice the already fused displayed mesh, without rebuilding or blocking orbit controls. */
 function requestContours() {
-  if(viewMode==='solid'||displayedModel!=='rectangles'||!displayedRecipe||contoursReady||contourWorker)return;
+  if(lamp?.active||viewMode==='solid'||displayedModel!=='rectangles'||!displayedRecipe||contoursReady||contourWorker)return;
   const source=sculpture.geometry;
   const worker=new Worker(new URL('./rectangles.worker.ts',import.meta.url),{type:'module'});
   contourWorker=worker;
@@ -336,7 +366,7 @@ const layerClipPlane = new THREE.Plane(new THREE.Vector3(0,0,-1),0);
 const layerClipPlanes = [layerClipPlane];
 let cutawayActive=false;
 function updateLayerCutaway(z:number) {
-  const enabled=showLayerInspector.checked&&hideAboveLayer.checked&&!!displayedRecipe;
+  const enabled=!lamp?.active&&showLayerInspector.checked&&hideAboveLayer.checked&&!!displayedRecipe;
   const changed=enabled!==cutawayActive;
   const moved=enabled&&layerClipPlane.constant!==z;
   layerClipPlane.constant=z;
@@ -357,7 +387,7 @@ catch { /* Default off when preferences are unavailable. */ }
 function updateSlice() {
   requestRender();
   el('layer-inspector').hidden = !showLayerInspector.checked;
-  highlight.visible = showLayerInspector.checked && !!displayedRecipe;
+  highlight.visible = !lamp?.active && showLayerInspector.checked && !!displayedRecipe;
   const index = Math.min(Number(layer.value), heights.length - 1);
   const z = heights[index];
   updateLayerCutaway(z);
@@ -374,6 +404,69 @@ function updateSlice() {
   el('layer-count').textContent = '0.20 mm inspection steps';
 
 }
+
+function showPreviewGeometry(geometry:THREE.BufferGeometry) {
+  stopContourWorker();
+  sculpture.geometry=geometry;
+  contours.geometry.dispose();contours.geometry=new THREE.BufferGeometry();contoursReady=false;
+  overhangSource=undefined;updateOverhangs();updateSlice();requestContours();requestRender(true);
+}
+function cancelVasePreview() {
+  vaseWorker?.terminate();vaseWorker=undefined;
+}
+function clearVasePreview() {
+  cancelVasePreview();
+  if(sculpture.geometry!==builtGeometry)showPreviewGeometry(builtGeometry);
+  vaseGeometry?.dispose();vaseGeometry=undefined;
+  vaseNote.hidden=true;
+}
+async function updateVasePreview() {
+  cancelVasePreview();
+  if(!vaseToggle.checked) {
+    showPreviewGeometry(builtGeometry);vaseNote.hidden=true;return;
+  }
+  if(!displayedRecipe)return;
+  vaseNote.hidden=false;
+  const ready=()=>{
+    showPreviewGeometry(vaseGeometry!);
+    vaseNote.textContent='0.4 mm wall · simulated 0.2 mm layers · '+(vaseGeometry!.index!.count/3).toLocaleString()+' facets. Display approximation, not a spiral toolpath; check the print in your slicer.';
+  };
+  if(vaseGeometry){ready();return;}
+  vaseNote.textContent='Checking the outer wall… Uncheck to cancel.';
+  const source=builtGeometry;
+  const worker=new Worker(new URL('./rectangles.worker.ts',import.meta.url),{type:'module'});
+  vaseWorker=worker;
+  const fail=(message:string)=>{
+    if(vaseWorker!==worker)return;
+    cancelVasePreview();vaseToggle.checked=false;
+    const detail=/collapsed triangle|inconsistently wound seam/.test(message)?'The thin-wall conversion hit a numerical mesh error. Try Fine preview detail and Build again.':message;
+    vaseNote.textContent='Vase preview unavailable: '+humanText(detail)+' Original model retained.';
+  };
+  worker.onerror=event=>fail(event.message||'The preview worker stopped unexpectedly.');
+  worker.onmessage=event=>{
+    if(vaseWorker!==worker||builtGeometry!==source)return;
+    const data=event.data;
+    if(data.progress){vaseNote.textContent=humanText(data.progress)+' Uncheck to cancel.';return;}
+    if(data.error){fail(data.error);return;}
+    cancelVasePreview();
+    vaseGeometry=new THREE.BufferGeometry();
+    vaseGeometry.setAttribute('position',new THREE.BufferAttribute(data.positions,3));
+    vaseGeometry.setAttribute('normal',new THREE.BufferAttribute(data.normals,3));
+    vaseGeometry.setIndex(new THREE.BufferAttribute(data.indices,1));vaseGeometry.computeBoundingBox();
+    ready();
+  };
+  worker.postMessage({operation:'vase-preview',quality:'preview',recipe:JSON.parse(displayedRecipe),previewDetail:displayedPreviewDetail,
+    mesh:{positions:source.getAttribute('position').array,indices:source.index!.array}});
+}
+vaseToggle.addEventListener('change',()=>void updateVasePreview());
+lamp=new LampPreview(scene,()=>displayedRecipe?{geometry:builtGeometry,recipe:JSON.parse(displayedRecipe)}:undefined,()=>{
+  document.body.classList.toggle('lamp-lit',!!lamp?.active);
+  document.querySelectorAll<HTMLButtonElement>('.viewbar button').forEach(button=>button.disabled=!!lamp?.active);
+  if(lamp?.active)cancelVasePreview();
+  else if(!lamp?.toggle.checked&&vaseToggle.checked&&!vaseGeometry&&!vaseWorker&&!building)void updateVasePreview();
+  updateExportButtons();updateOverhangs();updateSlice();requestRender(true);
+});
+
 
 interface LatticeResult { geometry: THREE.BufferGeometry; lines: Float32Array; triangles: number; components: number; sampleStep: number; uncored?:RectanglePreviewMesh; filledPockets?:number; filledVolume?:number }
 function buildGeometry<T = LatticeResult>(params: RectangleRecipe, quality: 'preview'|'export', worker: Worker, signal?: AbortSignal, extra:Record<string,unknown>={}): Promise<T> {
@@ -425,6 +518,8 @@ function buildGeometry<T = LatticeResult>(params: RectangleRecipe, quality: 'pre
 }
 async function rebuild() {
   if (exporting||building) return;
+  cancelVasePreview();lamp?.pause();
+  if(vaseToggle.checked&&!vaseGeometry)vaseNote.textContent='Vase preview will update after Build.';
   const ticket=++generation;
   const controller=new AbortController();buildAbort=controller;
   geometryWorker?.terminate();
@@ -442,12 +537,16 @@ async function rebuild() {
   status('Updating preview…');
   buildProgress.start({cavity:!!current.smoothCavity,reuseBase:cachedRectangleBase?.key===previewBaseKey(current,detail)});
   try {
+    const printerError=printerShapeError(current);if(printerError)throw new Error(printerError);
     const preview=validateRectangles(previewParameters(current,detail));
     geometryWorker=new Worker(new URL('./rectangles.worker.ts',import.meta.url),{type:'module'});
     const cached=cachedRectangleBase?.key===previewBaseKey(current,detail)?cachedRectangleBase.mesh:undefined;
     const source=cached?{mesh:cached,reuseBase:true,sampleStep:cached.sampleStep,components:cached.components}:undefined;
     if(cached)status('Reusing the checked strands; updating the interior…');
     result=await buildGeometry<LatticeResult>(preview,'preview',geometryWorker,controller.signal,{...source,contours:false,previewDetail:detail});
+    result.geometry.computeBoundingBox();
+    const fitError=printerFootprintError(result.geometry.boundingBox!);
+    if(fitError){result.geometry.dispose();throw new Error(fitError);}
   } catch(error) {
     if(ticket===generation) {
       building=false;buildAbort=undefined;geometryWorker=undefined;
@@ -460,11 +559,14 @@ async function rebuild() {
         updateBuildButton('Could not build: '+(error as Error).message);
       }
     }
-    updateExportButtons();return false;
+    updateExportButtons();
+    if(ticket===generation){lamp?.resume();if(!lamp?.toggle.checked&&vaseToggle.checked&&!vaseGeometry)void updateVasePreview();}
+    return false;
   }
   if(ticket!==generation) {result.geometry.dispose();return;}
   buildAbort=undefined;geometryWorker=undefined;
   buildProgress.update('Preparing display…',{phase:'display'});
+  clearVasePreview();
   displayedModel=model; displayedRecipe=JSON.stringify(current);displayedPreviewDetail=detail;
   stopContourWorker();
   if(model==='rectangles') {
@@ -474,8 +576,9 @@ async function rebuild() {
   } else cachedRectangleBase=undefined;
   const pocketNote=result.filledPockets===undefined?'':result.filledPockets===0?' No enclosed wall pockets found.':` Filled ${result.filledPockets} enclosed wall pockets.`;
   building=false;updateBuildButton('Preview is up to date.'+pocketNote);
-  sculpture.geometry.dispose();
-  sculpture.geometry = result.geometry;
+  builtGeometry.dispose();
+  builtGeometry=result.geometry;
+  sculpture.geometry = builtGeometry;
   requestRender(true);
   overhangSource=undefined;
   overhangOverlay.geometry.dispose();overhangOverlay.geometry=new THREE.BufferGeometry();
@@ -503,7 +606,7 @@ async function rebuild() {
   el('lightweight-note').textContent=result.triangles.toLocaleString()+' preview faces · '+((84+50*result.triangles)/1e6).toFixed(1)+' MB. For viewing and sharing.';
   buildProgress.finish('complete');
   const buildSeconds=((performance.now()-started)/1000).toFixed(2);
-  el('build-metrics').textContent='Displayed preview: '+result.triangles.toLocaleString()+' facets · built in '+buildSeconds+' s';
+  el('build-metrics').textContent='Built preview: '+result.triangles.toLocaleString()+' facets · built in '+buildSeconds+' s';
   el('build-metrics').hidden=false;
   status('Preview updated in '+buildSeconds+' s.'+pocketNote);
   updateExportButtons();
@@ -512,6 +615,8 @@ async function rebuild() {
     localStorage.setItem('contour-lab-study-v2',JSON.stringify({model:selection.model,rectangles}));
   } catch { status('Preview ready. Use Save recipe to preserve these settings.'); }
   requestContours();
+  lamp?.invalidate();
+  if(!lamp?.toggle.checked&&vaseToggle.checked&&!vaseWorker)void updateVasePreview();
   return true;
 }
 
@@ -711,12 +816,15 @@ const discShape=pane.addFolder({title:'03 / Bottom plate',expanded:true});
 discShape.addBinding(rectangles,'bottomDisc',{label:'Add bottom plate'})
   .element.querySelector('input')?.setAttribute('aria-label','Add bottom plate');
 const discBindings: {hidden:boolean}[]=[];
+const followPlate=discShape.addBinding(rectangles,'discFollowStrands',{label:'Follow strand outline'});
+followPlate.element.querySelector('input')?.setAttribute('aria-label','Follow strand outline');
+discBindings.push(followPlate);
 for(const [key,label,step] of [['discThickness','Plate thickness · mm',0.5],['discHole','Hole diameter · mm (0 = none)',0.5]] as const) {
   const binding=discShape.addBinding(rectangles,key,{label,min:rectangleLimits[key][0],max:rectangleLimits[key][1],step});
   binding.element.querySelector('input')?.setAttribute('aria-label',label);
   discBindings.push(binding);
 }
-parameterHint(discShape,'The plate follows the bottom outline and its dimensions.');
+parameterHint(discShape,'Follow strand outline extends the strands to the base and follows their changing outer contour through the whole plate thickness, including repair fill. Where strands leave gaps, it bridges their outermost edges. Off uses the simple bottom outline.');
 const cavityFolder=pane.addFolder({title:'04 / Smooth interior',expanded:false});
 const cavityBindings:{hidden:boolean;label:string|null|undefined;element:HTMLElement}[]=[];
 const enableCavity=cavityFolder.addBinding(cavityOptions,'enabled',{label:'Enable smooth interior'});
@@ -936,23 +1044,24 @@ async function downloadSTL(mode:'full'|'lightweight'|'reduced'|'smooth-wall'='fu
   const signal = exportAbort.signal;
   updateBuildButton(smoothWall?'Preparing smooth wall modifier…':lightweight?'Preparing lightweight STL…':'Preparing full-resolution STL…');
   updateExportButtons();
-  status(smoothWall?'Building the smooth wall modifier…':lightweight?'Saving the displayed preview as a lightweight STL…':'Building full-resolution STL…');
+  status(smoothWall?'Building the smooth wall modifier…':lightweight?'Saving the built model as a lightweight STL…':'Building full-resolution STL…');
   await new Promise(resolve => setTimeout(resolve, 30));
   try {
     signal.throwIfAborted();
+    const fitError=printerFootprintError(builtGeometry.boundingBox!);if(fitError)throw new Error(fitError);
     let data: DataView, overhang:number|undefined, reductionText='';
     if(lightweight&&solidBody) {
       const worker=new Worker(new URL('./rectangles.worker.ts',import.meta.url),{type:'module'});
       const result=await buildGeometry<LatticeResult>(current as RectangleRecipe,'preview',worker,signal,{solidBody,
-        mesh:{positions:sculpture.geometry.getAttribute('position').array,indices:sculpture.geometry.getIndex()!.array}});
-      try {data=geometrySTL(result.geometry);}finally{result.geometry.dispose();}
+        mesh:{positions:builtGeometry.getAttribute('position').array,indices:builtGeometry.getIndex()!.array}});
+      try {result.geometry.computeBoundingBox();const fitError=printerFootprintError(result.geometry.boundingBox!);if(fitError)throw new Error(fitError);data=geometrySTL(result.geometry);}finally{result.geometry.dispose();}
     } else if(lightweight) {
-      // Serialize only the displayed sculpture; overlays, slices and scene helpers are excluded.
-      data=geometrySTL(sculpture.geometry);
+      // Serialize the original build; vase mode, overlays and cuts are display only.
+      data=geometrySTL(builtGeometry);
     } else if(model==='rectangles') {
       const worker=new Worker(new URL('./rectangles.worker.ts',import.meta.url),{type:'module'});
       const result=await buildGeometry<LatticeResult>(current as RectangleRecipe,'export',worker,signal,{solidBody,...(smoothWall?{operation:'smooth-wall'}:{})});
-      try { data=geometrySTL(result.geometry); } finally { result.geometry.dispose(); }
+      try { result.geometry.computeBoundingBox();const fitError=printerFootprintError(result.geometry.boundingBox!);if(fitError)throw new Error(fitError);data=geometrySTL(result.geometry); } finally { result.geometry.dispose(); }
     }
     else throw new Error("Unsupported model.");
     signal.throwIfAborted();
@@ -1015,3 +1124,16 @@ requestRender(true);
 
 
 
+
+// Printer preferences are deliberately not part of a recipe or geometry cache key.
+for(const axis of ['x','y'] as const)el<HTMLInputElement>('printer-'+axis).value=String(printerEnvelope()[axis]);
+el('save-printer').addEventListener('click',()=>{
+  const x=el<HTMLInputElement>('printer-x'),y=el<HTMLInputElement>('printer-y');
+  if(!x.reportValidity()||!y.reportValidity())return;
+  try {
+    const p=savePrinterEnvelope({x:x.valueAsNumber,y:y.valueAsNumber});
+    const error=printerShapeError(rectangles,p)||(displayedRecipe?printerFootprintError(builtGeometry.boundingBox!,p):undefined);
+    el('printer-note').textContent=error??`Saved: ${p.x} × ${p.y} mm. Applies to shape editing, Build and STL export.`;
+    updateExportButtons();
+  }catch(error){el('printer-note').textContent=(error as Error).message;}
+});

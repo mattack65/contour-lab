@@ -1,3 +1,6 @@
+import {assertPlateHoleClear} from './plate-hole.ts';
+import type {PreviewDetail} from './preview-settings.ts';
+import {strandOutlinePlate} from './plate-outline.ts';
 import {centerAt} from './centreline.ts';
 import type {ProgressCallback} from './build-progress.ts';
 import {nativeUnion} from './native-union.ts';
@@ -233,7 +236,7 @@ export function inspectRectangleMesh(geometry: BufferGeometry,progress?:Progress
 }
 
 /** Boolean-union the actual swept plank meshes, removing buried intersection faces. */
-export async function unionRectangles(input: RectangleRecipe, runtime?: ManifoldToplevel, progress: ProgressCallback = () => {}, quality: RectangleQuality = 'export', previewRefinement = 0, previewStep?: number, deferTouchingSeams = false) {
+export async function unionRectangles(input: RectangleRecipe, runtime?: ManifoldToplevel, progress: ProgressCallback = () => {}, quality: RectangleQuality = 'export', previewRefinement = 0, previewStep?: number, deferTouchingSeams = false, previewDetail:PreviewDetail = 1) {
   const recipe = validateRectangles(input);
   const wasm = runtime ?? await Module();
   if (!runtime) wasm.setup();
@@ -260,19 +263,23 @@ export async function unionRectangles(input: RectangleRecipe, runtime?: Manifold
       if((i+1)%8===0||i+1===recipe.count)progress('Building individual strands…',{phase:'generate',completed:i+1,total:recipe.count,unit:'strands'});
     }
     if (recipe.bottomDisc) {
-      progress('Adding the bottom disc and centre hole…');
-      // Z=0..thickness overlaps the planks over the upper half of the disc.
-      // 512 segments keep the radial chord error under 0.003 mm at the size limit.
-      const outer = recipe.outline === 'circle'
-        ? wasm.Manifold.cylinder(recipe.discThickness, recipe.diameter / 2, recipe.diameter / 2, 512)
-        : wasm.Manifold.extrude([outlinePolygon(recipe)],recipe.discThickness);
-      const center=centerAt(recipe,0);
-      const shifted=(solid:Manifold)=>{if(center.x===0&&center.y===0)return solid;const moved=solid.translate([center.x,center.y,0]);solid.delete();return moved;};
-      if(recipe.discHole===0)solids.push(shifted(outer));
+      assertPlateHoleClear(recipe,solids,wasm);
+      if(recipe.discFollowStrands)solids.push(strandOutlinePlate(recipe,solids,wasm,progress,quality,previewDetail,sampleStep));
       else {
-        const bore = wasm.Manifold.cylinder(recipe.discThickness, recipe.discHole / 2, recipe.discHole / 2, 512);
-        try { solids.push(shifted(outer.subtract(bore))); }
-        finally { outer.delete(); bore.delete(); }
+        progress('Adding the bottom disc and centre hole…');
+        // Z=0..thickness overlaps the planks over the upper half of the disc.
+        // 512 segments keep the radial chord error under 0.003 mm at the size limit.
+        const outer = recipe.outline === 'circle'
+          ? wasm.Manifold.cylinder(recipe.discThickness, recipe.diameter / 2, recipe.diameter / 2, 512)
+          : wasm.Manifold.extrude([outlinePolygon(recipe)],recipe.discThickness);
+        const center=centerAt(recipe,0);
+        const shifted=(solid:Manifold)=>{if(center.x===0&&center.y===0)return solid;const moved=solid.translate([center.x,center.y,0]);solid.delete();return moved;};
+        if(recipe.discHole===0)solids.push(shifted(outer));
+        else {
+          const bore = wasm.Manifold.cylinder(recipe.discThickness, recipe.discHole / 2, recipe.discHole / 2, 512);
+          try { solids.push(shifted(outer.subtract(bore))); }
+          finally { outer.delete(); bore.delete(); }
+        }
       }
     }
     progress(recipe.bottomDisc?'Fusing the bottom disc and planks…':'Joining plank crossings into a lattice…');

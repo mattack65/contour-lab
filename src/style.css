@@ -237,3 +237,9 @@
 .silhouette-centre{cursor:move;}
 
 .build-actions{display:flex;gap:8px}.build-actions #build{flex:1;width:auto}.canvas-build #cancel-build{pointer-events:auto;border:1px solid #a66b52;color:#824730;background:#fff6f1;padding:10px 16px}.canvas-build #cancel-build[hidden]{display:none}#current-recipe{font-size:13px;line-height:1.5;overflow-wrap:anywhere;margin:-12px 0 20px;color:#48543e}
+
+.lamp-panel #lamp-controls>label{display:flex;justify-content:space-between;gap:8px;margin-top:10px;font-size:13px}.lamp-panel input[type=range]{width:100%;margin:5px 0}.lamp-panel output{font-variant-numeric:tabular-nums;color:#665d46}.lamp-panel [hidden]{display:none!important}
+
+.lamp-lit .workspace .intro, .lamp-lit .workspace .intro h1, .lamp-lit .workspace .intro p, .lamp-lit .workspace .eyebrow, .lamp-lit .axis-note, .lamp-lit .gesture-note, .lamp-lit .specimen { color: #c7c3b8; }
+
+.printer-settings{margin:18px 0;border-top:1px solid var(--line);padding-top:12px}.printer-settings summary{cursor:pointer;font-size:14px}.printer-settings fieldset{border:0;padding:10px 0;display:flex;gap:8px;flex-wrap:wrap}.printer-settings label{display:flex;align-items:center;gap:5px}.printer-settings input{width:85px;padding:5px}.printer-settings legend{font-size:12px;padding-top:12px}.printer-settings p{font-size:12px;line-height:1.5}.printer-settings #printer-note{color:#934922}

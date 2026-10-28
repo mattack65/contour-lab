@@ -1,3 +1,4 @@
+import {printerShapeError} from './printer-settings.ts';
 import {centerAt,CENTER_LIMIT} from './centreline.ts';
 import {outlineProfileError, editableBulgePoints, dimensionedBulgePoints, outlineSizeAt, rectangleDiameterRange, outlineYRecipe, rectangleLimits, presetBulgePoints} from './rectangles.ts';
 import type {RectangleRecipe} from './rectangles.ts';
@@ -121,9 +122,10 @@ export function silhouetteError(r:RectangleRecipe):string|undefined {
   if(levels.some(l=>![l.centerX,l.centerY].every(n=>Number.isFinite(n)&&Math.abs(n)<=CENTER_LIMIT+1e-8)))return `Centre offsets must be −${CENTER_LIMIT} to ${CENTER_LIMIT} mm.`;
   if(levels.some((l,i)=>!Number.isFinite(l.height)||(i>0&&l.height<=levels[i-1].height)))return 'Levels must rise in order between bottom and top.';
   for(const key of ['diameter','topDiameter','bottomSizeY','topSizeY'] as const)
-    if(!Number.isFinite(r[key])||r[key]<=0||r[key]>280)return 'End diameters and X/Y sizes must be greater than zero and at most 280 mm.';
+    if(!Number.isFinite(r[key])||r[key]<=0)return 'End diameters and X/Y sizes must be finite and greater than zero.';
   for(const [axis,profile] of [['X',r],['Y',outlineYRecipe(r)]] as const) {
     const range=rectangleDiameterRange(profile);
     const message=outlineProfileError(axis,range);if(message)return message;
   }
+  return printerShapeError(r);
 }

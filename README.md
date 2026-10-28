@@ -6,6 +6,8 @@ Strand thickness can follow the outline perimeter and vary with sine, sine-squar
 
 Custom strand cross-sections can be drawn in **Edit structure > Custom polygon > Edit polygon**. Drag, add or delete corners; outward points down and the sculpture centre is above. Shapes are saved with recipes. Concave outlines work with the same shape at both ends; blending between different end shapes requires convex polygons containing their bounding-box centre.
 
+Bottom plates can follow the strand outline. Optional vase and lamp previews show a thin wall or approximate internal LED lighting; these display options do not change STL exports. **Printer settings** sets independent X/Y limits (300 × 300 mm by default), saved in your browser.
+
 An experimental personal project, shared as-is. No support or maintenance commitments.
 
 | Standard light 1 · real print | Standard light 2 · real print |
@@ -38,6 +40,6 @@ Tested on Windows with Docker Desktop (Linux/amd64). The image is built for your
 
 ## Samples and licence
 
-The [samples](samples/) folder contains five example recipes. Click **Load** in Contour Lab and choose one of these JSON files, then click **Build**.
+The [samples](samples/) folder contains example recipes. Click **Load** in Contour Lab and choose one of these JSON files, then click **Build**.
 
 Contour Lab is licensed under **GPL-3.0-or-later**; see [LICENSE](LICENSE). Third-party components retain their own licences; see [THIRD_PARTY.md](THIRD_PARTY.md).

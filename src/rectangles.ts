@@ -75,6 +75,7 @@ export interface RectangleRecipe {
   randomTwist: boolean;
   twistSeed: number;
   bottomDisc: boolean;
+  discFollowStrands?: boolean;
   discHole: number;
   discThickness: number;
   motion: 'helix' | 'sine' | 'accelerating' | 'chirp' | 'wander' | 'zigzag';
@@ -100,7 +101,7 @@ export const rectangleDefaults: RectangleRecipe = {
   count: 36, width: 1, depth: 10, diameter: 200, topDiameter: 200, height: 200, twist: 0, orbitTwist: 90, alternateOrbit: false, layerHeight: 0.2,
   turnPower: 2, reverseAcceleration: false, waveEndCycles: 3, wanderAmplitude: 12, wanderBends: 4, wanderSeed: 1729,
   motion: 'helix', waveAmplitude: 8, waveCycles: 1, alternateTwist: false, randomTwist: false, twistSeed: 42424,
-  bottomDisc: false, discHole: 39, discThickness: 2, bulge: 0, twoBulges: false, bulgeLower: 0, bulgeUpper: 0,
+  discFollowStrands: false, bottomDisc: false, discHole: 39, discThickness: 2, bulge: 0, twoBulges: false, bulgeLower: 0, bulgeUpper: 0,
   section: 'rectangle', sectionSides: 32, taperSection: false, topWidth: 1, topDepth: 10, phaseTurns: 0,
   outline: 'circle', bottomSizeY: 200, topSizeY: 200,
   topInset: 0, insetSeed: 42,
@@ -112,8 +113,8 @@ export const rectangleDefaults: RectangleRecipe = {
 export const sineDefaults: RectangleRecipe = { ...rectangleDefaults, motion: 'sine', alternateOrbit: true };
 export const rectangleLimits = {
   thicknessAmplitude: [0, 95], thicknessCycles: [.25, 12],
-  sectionSides: [8, 128], count: [3, 512], width: [0.4, 40], depth: [1, 40], diameter: [0, 280], topDiameter: [0, 280],
-  bottomSizeY: [0, 280], topSizeY: [0, 280],
+  sectionSides: [8, 128], count: [3, 512], width: [0.4, 40], depth: [1, 40], diameter: [0, Infinity], topDiameter: [0, Infinity],
+  bottomSizeY: [0, Infinity], topSizeY: [0, Infinity],
   topInset: [-80, 80], insetSeed: [0, 999999], bottomInset: [-80, 80], bottomInsetSeed: [0, 999999],
   lowerInset: [-80, 80], lowerInsetSeed: [0, 999999], upperInset: [-80, 80], upperInsetSeed: [0, 999999],
   middleInset: [-80, 80], middleInsetSeed: [0, 999999],
@@ -130,7 +131,6 @@ export const rectangleLimits = {
 export function outlineProfileError(axis:string,range:{min:number;max:number}):string|undefined {
   if(!Number.isFinite(range.min)||!Number.isFinite(range.max))return `The ${axis} spline has a non-finite size. Adjust the level dimensions or heights.`;
   if(range.min<=0)return `The ${axis} spline reaches ${Number(range.min.toPrecision(5))} mm: widths must stay greater than zero, including between levels. Widen the narrow levels or soften the size changes.`;
-  if(range.max>280+1e-8)return `The ${axis} spline reaches ${Number(range.max.toPrecision(5))} mm, above the 280 mm maximum. Reduce the level sizes or soften the size changes.`;
 }
 
 export function validateRectangles(value: unknown): RectangleRecipe {
@@ -190,8 +190,8 @@ export function validateRectangles(value: unknown): RectangleRecipe {
         point[key]=raw[key];
       }
       if(raw.sizeX!==undefined||raw.sizeY!==undefined) {
-        if(!Number.isFinite(raw.sizeX)||!Number.isFinite(raw.sizeY)||raw.sizeX<=0||raw.sizeX>280||raw.sizeY<=0||raw.sizeY>280)
-          throw new Error(`Level ${i+1}: X and Y sizes must be greater than zero and at most 280 mm.`);
+        if(!Number.isFinite(raw.sizeX)||!Number.isFinite(raw.sizeY)||raw.sizeX<=0||raw.sizeY<=0)
+          throw new Error(`Level ${i+1}: X and Y sizes must be finite and greater than zero.`);
         point.sizeX=raw.sizeX;point.sizeY=raw.sizeY;
       }
       if(raw.lockProportions!==undefined) {
@@ -259,6 +259,9 @@ export function validateRectangles(value: unknown): RectangleRecipe {
   const bottomDisc = (value as Record<string, unknown>).bottomDisc;
   if (bottomDisc !== undefined && typeof bottomDisc !== 'boolean') throw new Error('Bottom disc must be true or false.');
   result.bottomDisc = bottomDisc ?? false;
+  const discFollowStrands=source.discFollowStrands??false;
+  if(typeof discFollowStrands!=='boolean')throw new Error('Follow strand outline must be true or false.');
+  result.discFollowStrands=discFollowStrands;
   const motion = (value as Record<string, unknown>).motion ?? 'helix';
   if (!['helix','sine','accelerating','chirp','wander','zigzag'].includes(motion as string)) throw new Error('Unknown path motion.');
   result.motion = motion as RectangleRecipe['motion'];
@@ -301,19 +304,8 @@ export function validateRectangles(value: unknown): RectangleRecipe {
       throw new Error('Reduce the plate thickness: random bulge points must sit above the plate.');
     if(result.discHole>0) {
     if (result.discHole >= outlineInscribedDiameter(result,0,0)) throw new Error('The centre hole must fit inside the bottom outline.');
-    const low = baseSectionSizeAt(result,result.discThickness/2), high = baseSectionSizeAt(result,result.discThickness);
-    const factor=thicknessMaximumScale(result);
-    const width = Math.max(low.width,high.width)*factor, depth = Math.max(low.depth,high.depth)*factor;
-    let clearRadius = edgeAtDiameter({...result,width}, outlineInscribedDiameter(result, result.discThickness / 2, result.discThickness))
-      - depth / 2 - Math.hypot(depth,width) / 2;
-    if(result.bottomInset>0) {
-      const x=rectangleDiameterRange(result,result.discThickness/2,result.discThickness).max;
-      const y=hasOutlineY(result)?rectangleDiameterRange(outlineYRecipe(result),result.discThickness/2,result.discThickness).max:x;
-      const radius=result.outline==='square'||result.outline==='rectangle'?Math.hypot(x,y)/2:Math.max(x,y)/2;
-      clearRadius-=result.bottomInset/100*radius;
-      if(result.discHole/2>=clearRadius)throw new Error('The bottom inset can reach the plate hole. Reduce the bottom inset or centre hole, or enlarge the bottom outline.');
-    }
-    if (result.discHole / 2 >= clearRadius) throw new Error('Reduce the centre hole so it stays clear of the planks.');
+    // Strand clearance is checked against the actual mesh when building the plate.
+
     }
   }
   // Plank intersections are intentional. The build pipeline unions any geometry
@@ -853,9 +845,9 @@ export function generateRectangles(input: RectangleRecipe, options: { quality?: 
     && (!hasOutlineY(recipe) || recipe.topSizeY === recipe.bottomSizeY)
     && (!recipe.taperSection || (recipe.topWidth === recipe.width && (recipe.section==='circle'||recipe.topDepth === recipe.depth)))
     && (recipe.bulgePoints ? recipe.bulgePoints.every(p=>p.sizeX!==undefined ? p.sizeX===recipe.diameter && p.sizeY===outlineSizeAt(recipe,0).y : p.bulge===0) : recipe.twoBulges ? recipe.bulgeLower === 0 && recipe.bulgeUpper === 0 : recipe.bulge === 0);
-  // Keep a solid underside and avoid coincident base caps. Default 2 mm disc:
-  // planks start at Z=1, overlap its upper 1 mm, and still end at the same height.
-  const bottom = recipe.bottomDisc ? recipe.discThickness / 2 : 0;
+  // Legacy simple plates overlap the upper half of the strand feet. A plate
+  // following the strands keeps their pattern all the way down to the base.
+  const bottom = recipe.bottomDisc && !recipe.discFollowStrands ? recipe.discThickness / 2 : 0;
   let heights: number[] = [bottom];
   if(straight)heights.push(recipe.height);
   else if(recipe.bulgePoints || pathKnots(recipe).length || thicknessKnots(recipe).length) {

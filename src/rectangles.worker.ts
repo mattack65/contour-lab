@@ -1,3 +1,4 @@
+import {vasePreview} from './vase-preview.ts';
 import {setNativeJobId} from './native-union.ts';
 import type {ProgressWork} from './build-progress.ts';
 import {parsePreviewDetail} from './preview-settings.ts';
@@ -22,12 +23,17 @@ self.onmessage = async event => {
       } finally {geometry.dispose();}
       return;
     }
-    self.postMessage({ progress: event.data.operation==='smooth-wall' ? 'Building the smooth wall modifier…' : event.data.quality === 'export' ? 'Building full-resolution strands…' : 'Building a lighter strand preview…' });
+    self.postMessage({ progress: event.data.operation==='vase-preview' ? 'Preparing vase preview…' : event.data.operation==='smooth-wall' ? 'Building the smooth wall modifier…' : event.data.quality === 'export' ? 'Building full-resolution strands…' : 'Building a lighter strand preview…' });
     const detail=event.data.quality==='preview'?parsePreviewDetail(event.data.previewDetail):1;
     const progress=(progress:string,work?:ProgressWork)=>self.postMessage({progress,work});
     let result;
     let uncored:RectanglePreviewMesh|undefined;
-    if(event.data.operation==='smooth-wall') {
+    if(event.data.operation==='vase-preview') {
+      const wasm=await Module({locateFile:()=>wasmURL});wasm.setup();
+      const geometry=previewGeometry(event.data.mesh);
+      try {result=vasePreview(geometry,event.data.recipe,wasm,progress,detail);}
+      finally {geometry.dispose();}
+    } else if(event.data.operation==='smooth-wall') {
       const wasm=await Module({locateFile:()=>wasmURL});wasm.setup();
       result=await smoothWallModifier(event.data.recipe,wasm,progress);
     } else if(event.data.quality==='preview' && event.data.mesh && (event.data.solidBody || event.data.recipe.smoothCavity || event.data.reuseBase)) {

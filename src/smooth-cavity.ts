@@ -1,12 +1,11 @@
-import {centerAt} from './centreline.ts';
-import {adaptiveStations} from './adaptive-sampling.ts';
+import {assertCavityPlateHoleClear,cutCavityPlateHole} from './cavity-plate-hole.ts';
 import type {ProgressCallback} from './build-progress.ts';
 import {nativeUnion} from './native-union.ts';
 import type {PreviewDetail} from './preview-settings.ts';
 import Module from 'manifold-3d';
 import type {ManifoldToplevel,Manifold} from 'manifold-3d';
 import {BufferGeometry,BufferAttribute} from 'three';
-import {outlinePolygon,validateRectangles,hasOutlineTransition,strandPerimeterScaleAt} from './rectangles.ts';
+import {validateRectangles} from './rectangles.ts';
 import type {RectangleRecipe,RectangleQuality} from './rectangles.ts';
 import {outerSolid} from './outer-solid.ts';
 import {fillEnclosedPockets} from './fill-enclosed-pockets.ts';
@@ -14,57 +13,8 @@ import {cavityFailure} from './cavity-errors.ts';
 import type {CavityStage} from './cavity-errors.ts';
 import {inspectRectangleMesh,assertConnectedRectangleSolid,LatticeSeamError,LatticeContactError,resolveLatticeContacts,weldCollapsedLatticeSliver} from './rectangle-union.ts';
 
-/** Insets use the same bottom-relative scale as strands. The clearance guard's
- * outward expansion stays absolute, independent of proportional sizing. */
-export function cavityContour(recipe:RectangleRecipe,z:number,inset:number,segments:number,radialExpansion=0) {
-  inset=inset*strandPerimeterScaleAt(recipe,z)-radialExpansion;
-  const ring=outlinePolygon(recipe,z,segments);
-  const sampled=!hasOutlineTransition(recipe)&&ring.length===512?ring.filter((_,i)=>i%(512/segments)===0):ring;
-  const center=centerAt(recipe,z);
-  return sampled.map(([x,y])=>{
-    const radius=Math.hypot(x,y);
-    if(radius-inset<0.5)throw new Error('The cavity closes near the centre. Decrease Smooth interior > Radial inset, or enlarge the outline/bulge profile.');
-    const scale=(radius-inset)/radius;
-    return [x*scale+center.x,y*scale+center.y] as [number,number];
-  });
-}
-
-function coreMesh(recipe:RectangleRecipe,quality:RectangleQuality,step:number,inset:number,top:number,
-  floor=recipe.smoothCavity!.floor,extraKnots:number[]=[],previewDetail:PreviewDetail=1,radialExpansion=0) {
-  const segments=quality==='export'?512:128*previewDetail;
-  const knots=[floor,...extraKnots,...(recipe.bulgePoints?.map(p=>p.height/100*recipe.height)
-    ?? (recipe.twoBulges?[recipe.height/3,2*recipe.height/3]:[recipe.height/2])),top]
-    .filter(z=>z>=floor && z<=top).sort((a,b)=>a-b);
-  let stations=[floor];
-  if(quality==='export')for(const end of knots) {
-    const start=stations[stations.length-1];if(end-start<1e-6)continue;
-    const n=Math.ceil((end-start)/step);
-    for(let j=1;j<=n;j++)stations.push(start+(end-start)*j/n);
-  }
-  if(quality==='preview') {
-    // Smooth surfaces have their own curvature, independent of strand crossings.
-    stations=adaptiveStations([...new Set(knots)],2/previewDetail,.1,.03/(previewDetail*previewDetail),
-      z=>cavityContour(recipe,z,inset,segments,radialExpansion));
-  }
-  const p:number[]=[],idx:number[]=[];
-  const count=cavityContour(recipe,floor,inset,segments,radialExpansion).length;
-  for(const z of stations)for(const [x,y] of cavityContour(recipe,z,inset,segments,radialExpansion))p.push(x,y,z);
-  for(let j=0;j<stations.length-1;j++)for(let i=0;i<count;i++) {
-    const a=j*count+i,b=j*count+(i+1)%count,c=b+count,d=a+count;
-    idx.push(a,b,c,a,c,d);
-  }
-  for(const [row,z,up] of [[0,floor,false],[stations.length-1,top,true]] as const) {
-    const centre=p.length/3,shift=centerAt(recipe,z);p.push(shift.x,shift.y,z);
-    for(let i=0;i<count;i++) {
-      const a=row*count+i,b=row*count+(i+1)%count;
-      if(up)idx.push(centre,a,b);else idx.push(centre,b,a);
-    }
-  }
-  const geometry=new BufferGeometry();
-  geometry.setAttribute('position',new BufferAttribute(new Float32Array(p),3));
-  geometry.setIndex(new BufferAttribute(new Uint32Array(idx),1));
-  return geometry;
-}
+import {cavityCoreMesh as coreMesh} from './cavity-core.ts';
+export {cavityContour} from './cavity-contour.ts';
 
 /** Optionally unite a larger smooth fill directly with the original lattice,
  * otherwise preserve the existing continuous outer wall. Then cut the cavity.
@@ -95,6 +45,7 @@ export async function smoothCavity(source:BufferGeometry,input:RectangleRecipe,q
     source.computeBoundingBox();
     const top=source.boundingBox!.max.z;
     const step=Math.min(sampleStep||recipe.layerHeight,quality==='export'?.5:2);
+    assertCavityPlateHoleClear(recipe,wasm,quality,step,previewDetail);
     let body:Manifold;
     if(repairing) {
       stage='adding the outer repair fill';
@@ -140,8 +91,12 @@ export async function smoothCavity(source:BufferGeometry,input:RectangleRecipe,q
       // Restore the complete original material below the plate top. This also
       // prevents the optional outer repair fill from changing the plate outline.
       const original=toSolid(source);
-      const plate=original.trimByPlane([0,0,-1],-recipe.discThickness);
+      let plate=original.trimByPlane([0,0,-1],-recipe.discThickness);
       solids.add(plate);
+      if(recipe.discHole>0) {
+        const bored=cutCavityPlateHole(plate,recipe,wasm);solids.add(bored);
+        release(plate);plate=bored;
+      }
       const previousCut=cut;
       cut=cut.add(plate);solids.add(cut);
       if(cut.status()!=='NoError')throw new Error('The bottom plate could not be restored as a closed solid.');

@@ -55,3 +55,9 @@ More physical prints made with Contour Lab. These illustrate other designs and a
 | ![Black fluted bowl](images/print-black-fluted-bowl.jpg) | ![Black wave vase](images/print-black-wave-vase.jpg) |
 | **White lattice lampshade** | |
 | ![White lattice lampshade](images/print-white-lattice-shade.jpg) | |
+
+| Lampshade collection | Purple bubble lamp |
+| --- | --- |
+| ![Collection of printed lampshades](images/print-lampshade-collection.jpg) | ![Purple illuminated bubble lampshade](images/print-purple-bubble-lamp.jpg) |
+| **White bubble vase** | **Wide illuminated lamp** |
+| ![White bubble vase on the printer](images/print-white-bubble-vase.jpg) | ![Wide illuminated lampshade](images/print-wide-illuminated-lamp.jpg) |

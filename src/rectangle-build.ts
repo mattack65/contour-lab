@@ -9,7 +9,7 @@ import {previewMesh,rectanglePreviewContours} from './rectangle-preview.ts';
 import {smoothCavity} from './smooth-cavity.ts';
 
 async function joinedRectangles(recipe: RectangleRecipe, quality: RectangleQuality,
-  runtime: ManifoldToplevel | undefined, progress: (message: string) => void, coarseStep:number) {
+  runtime: ManifoldToplevel | undefined, progress: (message: string) => void, coarseStep:number, detail:PreviewDetail) {
   // A different sampling grid can expose slivers or coincident contact edges even
   // when the fine STL is valid. Retry once at half spacing, then use the
   // original export grid. Never drop triangles or bypass topology checks.
@@ -17,7 +17,7 @@ async function joinedRectangles(recipe: RectangleRecipe, quality: RectangleQuali
     const full = quality === 'export' || attempt === 2 || coarseStep / 2 ** attempt <= recipe.layerHeight;
     try {
       return await unionRectangles(recipe, runtime, progress, full ? 'export' : 'preview', attempt, coarseStep,
-        quality==='export'&&recipe.smoothCavity?.repairInset!==undefined);
+        quality==='export'&&recipe.smoothCavity?.repairInset!==undefined,detail);
     } catch (error) {
       const samplingFailure=error instanceof LatticeSeamError
         || (error instanceof Error && error.message.includes('collapsed triangle'));
@@ -39,7 +39,7 @@ export async function buildRectangles(input: RectangleRecipe, quality: Rectangle
   const mustJoin = recipe.alternateOrbit || recipe.bottomDisc || hasPhaseShift(recipe)
     || rectangleClearance(recipe, sampleStep) <= 0;
   let result = mustJoin
-    ? await joinedRectangles(recipe, quality, runtime, progress, sampleStep)
+    ? await joinedRectangles(recipe, quality, runtime, progress, sampleStep, detail)
     : { ...generateRectangles(recipe, { quality, contours: false, previewStep:sampleStep }), components: recipe.count };
   let filledPockets:number|undefined,filledVolume:number|undefined;
   try {

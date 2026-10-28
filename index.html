@@ -47,6 +47,15 @@
           <div class="panel-heading"><span class="eyebrow">VIEW &amp; FILES</span><h2>Preview &amp; export.</h2><p>Shape the outline, then edit its structure. Space opens Structure.</p><button id="open-silhouette" data-open-silhouette aria-haspopup="dialog">Edit shape</button><button id="expand-recipe" aria-haspopup="dialog" aria-controls="recipe-dialog" aria-keyshortcuts="Space" title="Edit structure (Space)" aria-expanded="false">Edit structure · Space</button></div>
 
         <div class="shared-recipe-files"><div class="recipe-actions recipe-toolbar"><button id="save">Save</button><button id="save-as" title="Save a separate recipe file">Save as…</button><button id="load">Load</button><button id="clear" title="Start again with the simple default sculpture">Clear</button><input id="recipe-file" type="file" accept=".json,application/json" hidden /></div><p id="current-recipe" aria-live="polite">Recipe: Unsaved</p><p id="recipe-migration" class="parameter-hint" role="status" hidden></p></div>
+          <details class="printer-settings"><summary>Printer settings</summary>
+            <fieldset id="printer-envelope"><legend>Printable envelope · mm</legend>
+              <label>X <input id="printer-x" aria-label="Printer X envelope" type="number" min="0.01" step="any" value="300" required /></label>
+              <label>Y <input id="printer-y" aria-label="Printer Y envelope" type="number" min="0.01" step="any" value="300" required /></label>
+              <button id="save-printer" type="button">Apply</button>
+            </fieldset>
+            <p>Saved in this browser, independently of recipes. Limits spline widths and the finished footprint in its current orientation. No allowance for brims or automatic rotation.</p>
+            <p id="printer-note" role="status" aria-live="polite"></p>
+          </details>
           <div class="preview-detail-control">
             <fieldset id="preview-detail" class="horizontal-options">
               <legend>Preview detail</legend>
@@ -78,6 +87,30 @@
             </fieldset>
             <p id="sculpture-color-note">Preview appearance · no rebuild needed. STL files do not store color or finish.</p>
           </div>
+          <div class="overhang-control">
+            <label><input id="vase-preview" type="checkbox" disabled /> Vase mode preview · 0.4 mm wall</label>
+            <p>Simulated 0.2 mm layers, open top, existing bottom plate or cavity floor kept. Requires a continuous outer wall. Display only; STL exports keep the original model.</p>
+            <p id="vase-preview-note" role="status" aria-live="polite" hidden></p>
+          </div>
+          <div class="overhang-control lamp-panel">
+            <label><input id="lamp-preview" type="checkbox" disabled /> Lamp preview · smooth 0.4 mm shade</label>
+            <p>Small upward-facing LED centred on a 60 mm disc at the bottom hole. White translucent plastic in dim surroundings.</p>
+            <div id="lamp-controls" hidden>
+              <label for="lamp-height">LED above plate <output id="lamp-height-value">2.0 mm</output></label>
+              <input id="lamp-height" type="range" min="0" max="300" step="0.5" value="2" />
+              <label for="lamp-brightness">Brightness <output id="lamp-brightness-value">1.5×</output></label>
+              <input id="lamp-brightness" type="range" min="0" max="6" step="0.1" value="1.5" />
+              <label for="lamp-warmth">Light colour <output id="lamp-warmth-value">3000 K</output></label>
+              <input id="lamp-warmth" type="range" min="1800" max="6500" step="100" value="3000" />
+              <label for="lamp-translucency">Translucency <output id="lamp-translucency-value">65%</output></label>
+              <input id="lamp-translucency" type="range" min="0" max="1" step="0.01" value="0.65" />
+              <label for="lamp-room">Room light <output id="lamp-room-value">12%</output></label>
+              <input id="lamp-room" type="range" min="0" max="0.5" step="0.01" value="0.12" />
+              <label><input id="lamp-fixture" type="checkbox" checked /> Show LED disc</label>
+            </div>
+            <p id="lamp-note" role="status" aria-live="polite" hidden></p>
+          </div>
+
           <div class="overhang-control">
             <label><input id="show-overhangs" type="checkbox" /> Show overhangs in red</label>
             <label class="overhang-threshold" for="overhang-threshold">Threshold · ° <input id="overhang-threshold" type="number" min="0" max="90" step="1" value="45" /></label>
