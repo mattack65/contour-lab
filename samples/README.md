@@ -60,4 +60,4 @@ More physical prints made with Contour Lab. These illustrate other designs and a
 | --- | --- |
 | ![Collection of printed lampshades](images/print-lampshade-collection.jpg) | ![Purple illuminated bubble lampshade](images/print-purple-bubble-lamp.jpg) |
 | **White bubble vase** | **Wide illuminated lamp** |
-| ![White bubble vase on the printer](images/print-white-bubble-vase.jpg) | ![Wide illuminated lampshade](images/print-wide-illuminated-lamp.jpg) |
+| ![White bubble vase on the printer](images/print-white-bubble-vase.jpg) | ![Wide illuminated lampshade](images/print-wide-lamp-on-table.jpg) |
